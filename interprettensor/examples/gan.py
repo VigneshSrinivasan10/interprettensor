@@ -125,6 +125,8 @@ def train():
             D_params_num = len(tf.trainable_variables())
         with tf.variable_scope('generator'):
             G = generator()
+            pdb.set_trace()
+            
             Gout = G.forward(tf.random_normal([FLAGS.batch_size, FLAGS.input_size]))
             #pdb.set_trace()
     with tf.variable_scope('model', reuse=True):

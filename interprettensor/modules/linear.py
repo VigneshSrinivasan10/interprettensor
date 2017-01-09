@@ -21,28 +21,33 @@ class Linear(Module):
     Linear Layer
     '''
 
-    def __init__(self, input_dim, output_dim, input_shape=(10,784), keep_prob=1.0, name="linear"):
+    def __init__(self, output_dim, batch_size=None, input_dim = None, keep_prob=1.0, name="linear"):
         self.name = name
         Module.__init__(self)
 
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.input_shape = input_shape
+        self.batch_size = batch_size
         self.keep_prob = keep_prob
         
+        
+    def forward(self, input_tensor):
+        self.input_tensor = input_tensor
+        inp_shape = self.input_tensor.get_shape().as_list()
+
+
+        #import pdb;pdb.set_trace()
+        if len(inp_shape)!=2:
+            import numpy as np
+            self.input_dim =  np.prod(inp_shape[1:])
+            self.input_tensor = tf.reshape(self.input_tensor,[inp_shape[0], self.input_dim])
+        else:
+            self.input_dim = inp_shape[1]
         self.weights_shape = [self.input_dim, self.output_dim]
         #with tf.name_scope(self.name):
         self.weights = variables.weights(self.weights_shape, name=self.name)
         self.biases = variables.biases(self.output_dim, name=self.name)
 
-    def forward(self, input_tensor, batch_size=10, img_dim=28):
-        self.input_tensor = input_tensor
-        inp_shape = self.input_tensor.get_shape().as_list()
-                
-        #import pdb;pdb.set_trace()
-        if len(inp_shape)!=2:
-            import numpy as np
-            self.input_tensor = tf.reshape(self.input_tensor,[batch_size, np.prod(inp_shape[1:])])
         #import pdb;pdb.set_trace()
         with tf.name_scope(self.name):
             self.activations = tf.nn.bias_add(tf.matmul(self.input_tensor, self.weights), self.biases, name=self.name)

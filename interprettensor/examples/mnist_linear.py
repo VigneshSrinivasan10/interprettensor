@@ -52,11 +52,11 @@ FLAGS = flags.FLAGS
 
 
 def nn():
-    return Sequential([Linear(784,500, input_shape=(FLAGS.batch_size,784)), 
+    return Sequential([Linear(input_dim=784,output_dim=500, batch_size=FLAGS.batch_size), 
                      Relu(),
-                     Linear(500, 100), 
+                     Linear(100), 
                      Relu(),
-                     Linear(100, 10), 
+                     Linear(10), 
                      Softmax()])
 
 
@@ -97,11 +97,11 @@ def train():
             #RELEVANCE = net.lrp(y, 'alphabeta', 0.5)
 
             # LRP layerwise 
-            # relevance_layerwise = []
-            # R = y
-            # for layer in net.modules[::-1]:
-            #     R = net.lrp_layerwise(layer, R, 'simple')
-            #     relevance_layerwise.append(R)
+            relevance_layerwise = []
+            R = y
+            for layer in net.modules[::-1]:
+                R = net.lrp_layerwise(layer, R, 'simple')
+                relevance_layerwise.append(R)
         else:
             RELEVANCE = []
         
@@ -120,7 +120,8 @@ def train():
     utils = Utils(sess, FLAGS.checkpoint_dir)
     if FLAGS.reload_model:
         utils.reload_model()
-
+    pdb.set_trace()
+            
     # iterate over train and test data
     for i in range(FLAGS.max_steps):
         if i % FLAGS.test_every == 0:
@@ -133,8 +134,15 @@ def train():
         else:
             d = feed_dict(mnist, True)
             inp = {x:d[0], y_:d[1], keep_prob:d[2]}
-            summary, _ , relevance_train= sess.run([merged, train.train, RELEVANCE], feed_dict=inp)
+            # summary, _ , relevance_train= sess.run([merged, train.train, RELEVANCE], feed_dict=inp)
+            # train_writer.add_summary(summary, i)
+
+            summary, _ , relevance_train,op, rel_layer= sess.run([merged, train.train, RELEVANCE,y, relevance_layerwise], feed_dict=inp)
             train_writer.add_summary(summary, i)
+            pdb.set_trace()
+            print([np.sum(rel) for rel in rel_layer])
+            print(np.sum(relevance_train))
+            print(np.sum(op))
 
     # save model if required
     if FLAGS.save_model:

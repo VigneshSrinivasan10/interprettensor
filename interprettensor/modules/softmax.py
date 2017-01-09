@@ -41,7 +41,9 @@ class Softmax(Module):
         # just propagate R further down.
         # makes sure subroutines never get called.
         self.R = R
-        Rx = self.R  * self.input_tensor
+        #Rx = self.R  * tf.nn.softmax(self.input_tensor)
+        Rx = self.R  * self.activations
+        
         #Rx = tf.nn.softmax(self.activations) * self.activations
         tf.summary.histogram(self.name, Rx)
         return Rx

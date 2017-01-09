@@ -53,15 +53,14 @@ FLAGS = flags.FLAGS
 
 
 def nn():
-    return Sequential([Convolution(input_dim=1,output_dim=32,input_shape=(FLAGS.batch_size, 28)),
-                    
-                     MaxPool(),
-                     Tanh(),
-                     Convolution(input_dim=32,output_dim=64),
-                     MaxPool(),
-                     Tanh(),  
-                     Linear(256, 10), 
-                     Softmax()])
+    return Sequential([Convolution(output_depth=32,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28),
+                    Tanh(),
+                    MaxPool(),
+                    Convolution(64),
+                    Tanh(),  
+                    MaxPool(),
+                    Linear(10), 
+                    Softmax()])
 
 
 
@@ -93,8 +92,8 @@ def train():
         train = net.fit(output=y,ground_truth=y_,loss='softmax_crossentropy',optimizer='adam', opt_params=[FLAGS.learning_rate])
     with tf.variable_scope('relevance'):
         if FLAGS.relevance_bool:
-            RELEVANCE = net.lrp(y, FLAGS.relevance_method, 1.0)
-            #RELEVANCE = net.lrp(y, 'epsilon', 1e-8)
+            #RELEVANCE = net.lrp(y, FLAGS.relevance_method, 1.0)
+            RELEVANCE = net.lrp(y, 'simple', 1e-8)
             #RELEVANCE = net.lrp(y, 'ww', 0)
             #RELEVANCE = net.lrp(y, 'flat', 0)
             #RELEVANCE = net.lrp(y, 'alphabeta', 0.7)
@@ -102,6 +101,9 @@ def train():
             relevance_layerwise = []
             R = y
             for layer in net.modules[::-1]:
+                # if layer == net.modules[0]:
+                #     pdb.set_trace()
+                #     hi = net.check
                 R = net.lrp_layerwise(layer, R, 'simple')
                 relevance_layerwise.append(R)
 
@@ -132,10 +134,12 @@ def train():
         else:  
             d = feed_dict(mnist, True)
             inp = {x:d[0], y_: d[1], keep_prob: d[2]}
-            summary, _ , relevance_train, rel_layer= sess.run([merged, train.train, RELEVANCE, relevance_layerwise], feed_dict=inp)
+            summary, _ , relevance_train,op, rel_layer= sess.run([merged, train.train, RELEVANCE,y, relevance_layerwise], feed_dict=inp)
             train_writer.add_summary(summary, i)
-    pdb.set_trace()
-    print([np.sum(rel) for rel in rel_layer])
+            pdb.set_trace()
+            print([np.sum(rel) for rel in rel_layer])
+            print(np.sum(relevance_train))
+            print(np.sum(op))
 
 
     # save model if required
