@@ -23,7 +23,9 @@ class Convolution(Module):
 
     def __init__(self, output_depth, batch_size=None, input_dim = None, input_depth=None, kernel_size=5, stride_size=2, keep_prob=1.0, pad = 'SAME',name="conv2d"):
         self.name = name
+        #self.input_tensor = input_tensor
         Module.__init__(self)
+        
         
         self.batch_size = batch_size
         self.input_dim = input_dim
@@ -169,7 +171,8 @@ class Convolution(Module):
                 #pdb.set_trace()
                 Z = term1 * term2
                 t1 = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
-                Zs = t1 + t2
+                #Zs = t1 + t2
+                Zs = t1
                 stabilizer = 1e-12*(tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
                 Zs += stabilizer
                 result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4)

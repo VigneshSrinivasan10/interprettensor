@@ -16,7 +16,7 @@ from module import Module
 import variables
 import pdb
 
-class Tconvolution(Module):
+class Upconvolution(Module):
     '''
     Fractionally strided convolutional Layer /
     Convolutional transpose Layer

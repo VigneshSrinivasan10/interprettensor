@@ -40,6 +40,7 @@ class Sequential(Module):
         Module.__init__(self)
         self.modules = modules
 
+
     def forward(self,X):
         '''
         Realizes the forward pass of an input through the net
@@ -67,7 +68,10 @@ class Sequential(Module):
         for m in self.modules:
             m.batch_size=self.modules[0].batch_size
             print m.name+'::',
+            print X.get_shape().as_list()
+            
             X = m.forward(X)
+            
         print '\n'+ '------------------------------------------------- '
         
         return X

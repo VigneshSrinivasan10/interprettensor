@@ -53,9 +53,12 @@ FLAGS = flags.FLAGS
 
 
 def nn():
+    
     return Sequential([Convolution(output_depth=32,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28),
                     Tanh(),
-                    MaxPool(),
+                    #MaxPool(),
+                    Convolution(64),
+                    Tanh(),  
                     Convolution(64),
                     Tanh(),  
                     MaxPool(),
@@ -136,10 +139,10 @@ def train():
             inp = {x:d[0], y_: d[1], keep_prob: d[2]}
             summary, _ , relevance_train,op, rel_layer= sess.run([merged, train.train, RELEVANCE,y, relevance_layerwise], feed_dict=inp)
             train_writer.add_summary(summary, i)
-            pdb.set_trace()
-            print([np.sum(rel) for rel in rel_layer])
-            print(np.sum(relevance_train))
-            print(np.sum(op))
+    pdb.set_trace()
+    print([np.sum(rel) for rel in rel_layer])
+    print(np.sum(relevance_train))
+    print(np.sum(op))
 
 
     # save model if required
