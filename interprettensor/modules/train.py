@@ -30,14 +30,14 @@ class Train():
         if self.loss=='softmax_crossentropy':
             #Cross Entropy loss:
             with tf.name_scope('cross_entropy'):
-                diff = tf.nn.softmax_cross_entropy_with_logits(self.output, self.ground_truth)
+                diff = tf.nn.softmax_cross_entropy_with_logits(logits=self.output, labels=self.ground_truth)
                 self.cost = tf.reduce_mean(diff)
 
 
         elif self.loss=='sigmoid_crossentropy':
             #Cross Entropy loss:
             with tf.name_scope('cross_entropy'):
-                diff = tf.nn.sigmoid_cross_entropy_with_logits(self.output, self.ground_truth)
+                diff = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.output, labels=self.ground_truth)
                 self.cost = tf.reduce_mean(diff)
 
         

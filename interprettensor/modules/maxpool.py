@@ -71,7 +71,7 @@ class MaxPool(Module):
             for j in xrange(Wout):
                 input_slice = self.pad_input_tensor[:, i*hstride:i*hstride+hf , j*wstride:j*wstride+wf , : ]
                 Z = tf.equal( self.activations[:,i:i+1, j:j+1,:], input_slice)
-                Z = tf.select(Z, tf.ones_like(Z, dtype=tf.float32), tf.zeros_like(Z,dtype=tf.float32) )
+                Z = tf.where(Z, tf.ones_like(Z, dtype=tf.float32), tf.zeros_like(Z,dtype=tf.float32) )
                 Zs = tf.reduce_sum(Z, [1,2], keep_dims=True)
                 result = (Z/Zs) * self.R[:,i:i+1,j:j+1,:]
                 #pad each result to the dimension of the out

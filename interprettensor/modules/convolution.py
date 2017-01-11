@@ -171,8 +171,8 @@ class Convolution(Module):
                 #pdb.set_trace()
                 Z = term1 * term2
                 t1 = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
-                Zs = t1 + t2
-                #Zs = t1
+                #Zs = t1 + t2
+                Zs = t1
                 stabilizer = 1e-8*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
                 Zs += stabilizer
                 result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4)
