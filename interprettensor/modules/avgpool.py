@@ -75,7 +75,7 @@ class AvgPool(Module):
                 term1 = self.activations[:,i:i+1, j:j+1,:]
                 Z = term1 == term2
                 Zs = tf.reduce_sum(Z, [1,2], keep_dims=True)
-                stabilizer = 1e-8*(tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs)*-1, tf.ones_like(Zs)))
+                stabilizer = 1e-8*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs)*-1, tf.ones_like(Zs)))
                 Zs += stabilizer
                 result = (Z/Zs) * self.R[:,i:i+1,j:j+1,:]
                 #pad each result to the dimension of the out
@@ -171,7 +171,7 @@ class AvgPool(Module):
             for j in xrange(Wout):
                 Z = self.pad_input_tensor[:, i*hstride:i*hstride+hf , j*wstride:j*wstride+wf , : ]
                 Zs = tf.reduce_sum(Z, [1,2], keep_dims=True)
-                stabilizer = epsilon*(tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs)*-1, tf.ones_like(Zs)))
+                stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs)*-1, tf.ones_like(Zs)))
                 Zs += stabilizer
                 result = (Z/Zs) * self.R[:,i:i+1,j:j+1,:]
                 #pad each result to the dimension of the out
@@ -217,8 +217,8 @@ class AvgPool(Module):
                 Z = self.pad_input_tensor[:, i*hstride:i*hstride+hf , j*wstride:j*wstride+wf , : ]
                 
                 if not alpha == 0:
-                    Zp = tf.select(tf.greater(Z,0),Z, tf.zeros_like(Z))
-                    t2 = tf.expand_dims(tf.expand_dims(tf.select(tf.greater(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
+                    Zp = tf.where(tf.greater(Z,0),Z, tf.zeros_like(Z))
+                    t2 = tf.expand_dims(tf.expand_dims(tf.where(tf.greater(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
                     t1 = tf.expand_dims( tf.reduce_sum(Zp, 1), 1)
                     Zsp = t1 + t2
                     Ralpha = alpha + tf.reduce_sum((Z / Zsp) * tf.expand_dims(self.R, 1),2)
@@ -226,8 +226,8 @@ class AvgPool(Module):
                     Ralpha = 0
 
                 if not beta == 0:
-                    Zn = tf.select(tf.lesser(Z,0),Z, tf.zeros_like(Z))
-                    t2 = tf.expand_dims(tf.expand_dims(tf.select(tf.lesser(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
+                    Zn = tf.where(tf.lesser(Z,0),Z, tf.zeros_like(Z))
+                    t2 = tf.expand_dims(tf.expand_dims(tf.where(tf.lesser(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
                     t1 = tf.expand_dims( tf.reduce_sum(Zn, 1), 1)
                     Zsp = t1 + t2
                     Rbeta = beta + tf.reduce_sum((Z / Zsp) * tf.expand_dims(self.R, 1),2)

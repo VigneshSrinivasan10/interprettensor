@@ -19,7 +19,7 @@ from softmax import Softmax
 from relu import Relu
 from sigmoid import Sigmoid
 from convolution import Convolution
-from tconvolution import Tconvolution
+from upconvolution import Upconvolution
 from sequential import Sequential
 from avgpool import AvgPool
 from maxpool import MaxPool

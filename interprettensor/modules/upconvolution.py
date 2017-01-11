@@ -22,50 +22,49 @@ class Upconvolution(Module):
     Convolutional transpose Layer
     '''
 
-    def __init__(self, input_dim=3, output_dim=64, input_shape = (10,28), kernel_size=(5,5), stride_size=(2,2), keep_prob=1.0, pad = 'SAME',name="deconv2d"):
+    def __init__(self, output_depth, input_depth=None, batch_size=None, input_dim=None, kernel_size=5, stride_size=2, keep_prob=1.0, pad = 'SAME',name="deconv2d"):
         self.name = name
         Module.__init__(self)
         
-        self.input_shape = input_shape
+        self.input_depth = input_depth
         self.input_dim = input_dim
         #self.check_input_shape()
-
-        self.output_dim = output_dim
+        self.batch_size = batch_size
+        self.output_depth = output_depth
         self.kernel_size = kernel_size
         self.stride_size = stride_size
         self.keep_prob = keep_prob
-        
-        self.weights_shape = [self.kernel_size[0], self.kernel_size[1], self.output_dim, self.input_dim ]
-        self.strides = [1,self.stride_size[0], self.stride_size[1],1]
         self.pad = pad
         
-        
-        with tf.variable_scope(self.name):
-            self.weights = variables.weights(self.weights_shape)
-            self.biases = variables.biases(self.output_dim)
-        
-
-    def forward(self, input_tensor, batch_size=10, img_dim=28):
-        self.input_tensor = input_tensor
-        #pdb.set_trace()
+    def check_input_shape(self):
         inp_shape = self.input_tensor.get_shape().as_list()
-        batch_size = inp_shape[0]
-        if self.pad == 'SAME':
-            output_shape = tf.pack([batch_size, inp_shape[1]*self.stride_size[0], inp_shape[1]*self.stride_size[1], self.output_dim])
-        elif self.pad == 'VALID':
-            output_shape = tf.pack([batch_size, (inp_shape[1]-1)*self.stride_size[0]+self.kernel_size[0],(inp_shape[2]-1)*self.stride_size[1]+self.kernel_size[1], self.output_dim])
         try:
             if len(inp_shape)!=4:
-                self.input_tensor = tf.reshape(self.input_tensor,[batch_size, 1,1,inp_shape[-1]])
-                inp_shape = self.input_tensor.get_shape().as_list()
-                if self.pad == 'SAME':
-                    output_shape = tf.pack([batch_size, inp_shape[1]*self.stride_size[0], inp_shape[1]*self.stride_size[1], self.output_dim])
-                elif self.pad == 'VALID':
-                    output_shape = tf.pack([batch_size, (inp_shape[1]-1)*self.stride_size[0]+self.kernel_size[0],(inp_shape[2]-1)*self.stride_size[1]+self.kernel_size[1], self.output_dim])
-
+                mod_shape = [self.batch_size, self.input_dim,self.input_dim,self.input_depth]
+                self.input_tensor = tf.reshape(self.input_tensor, mod_shape)
         except:
-            raise ValueError('Expected dimension of input tensor: 4')
+            raise ValueError('Expected dimension of input tensor: 4; Specify input_dim in layer')
         
+    def forward(self, input_tensor):
+        self.input_tensor = input_tensor
+        self.check_input_shape()
+        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+        self.input_depth = in_depth
+        #pdb.set_trace()
+        inp_shape = self.input_tensor.get_shape().as_list()
+        if self.pad == 'SAME':
+            output_shape = tf.pack([self.batch_size, inp_shape[1]*self.stride_size, inp_shape[1]*self.stride_size, self.output_depth])
+        elif self.pad == 'VALID':
+            output_shape = tf.pack([self.batch_size, (inp_shape[1]-1)*self.stride_size+self.kernel_size,(inp_shape[2]-1)*self.stride_size+self.kernel_size, self.output_depth])
+
+        self.weights_shape = [self.kernel_size, self.kernel_size, self.output_depth, self.input_depth ]
+        
+        self.strides = [1,self.stride_size, self.stride_size,1]
+        with tf.variable_scope(self.name):
+            self.weights = variables.weights(self.weights_shape)
+            self.biases = variables.biases(self.output_depth)
+        
+       
         with tf.name_scope(self.name):
             #pdb.set_trace()
             #deconv = tf.nn.atrous_conv2d(self.input_tensor, self.weights, rate=2, padding='SAME')

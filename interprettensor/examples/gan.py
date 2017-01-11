@@ -24,7 +24,7 @@ from modules.relu import Relu
 from modules.tanh import Tanh
 from modules.sigmoid import Sigmoid
 from modules.convolution import Convolution
-from modules.tconvolution import Tconvolution
+from modules.upconvolution import Upconvolution as Tconvolution
 import modules.render as render
 
 from modules.avgpool import AvgPool
@@ -75,13 +75,13 @@ def generator():
                        Tanh(),
                        Convolution(input_dim=7,input_depth=128,output_depth=32), #4x4
                        Tanh(),
-                       Tconvolution(input_dim=32,output_dim=128, kernel_size=(3,3)), #8x8
+                       Tconvolution(output_depth=128, kernel_size=3), #8x8
                        Tanh(),
-                       Tconvolution(input_dim=128,output_dim=256, kernel_size=(5,5), stride_size=(1,1), pad='VALID'), #12x12
+                       Tconvolution(output_depth=256, kernel_size=5, stride_size=1, pad='VALID'), #12x12
                        Tanh(),
-                       Tconvolution(input_dim=256,output_dim=32, kernel_size=(3,3)), #24X24 
+                       Tconvolution(output_depth=32, kernel_size=3), #24X24 
                        Tanh(),
-                       Tconvolution(input_dim=32,output_dim=1, kernel_size=(5,5), stride_size=(1,1), pad='VALID'), #28X28
+                       Tconvolution(output_depth=1, kernel_size=5, stride_size=1, pad='VALID'), #28X28
                        Tanh()])
 
 

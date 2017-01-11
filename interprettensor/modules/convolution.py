@@ -113,7 +113,7 @@ class Convolution(Module):
             for j in xrange(Wout):
                 Z = image_patches[:,i:i+1,j:j+1,:,:] * filter_flatten
                 Zs = tf.reduce_sum(Z, [1,2,3], keep_dims=True) +  tf.expand_dims(self.biases,0)
-                stabilizer = 1e-12*(tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+                stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
                 Zs += stabilizer
                 result = tf.reduce_sum( (Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4,keep_dims=True)
                 result = tf.reshape(result, [in_N,hf,wf,df])
@@ -171,9 +171,9 @@ class Convolution(Module):
                 #pdb.set_trace()
                 Z = term1 * term2
                 t1 = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
-                #Zs = t1 + t2
-                Zs = t1
-                stabilizer = 1e-12*(tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+                Zs = t1 + t2
+                #Zs = t1
+                stabilizer = 1e-8*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
                 Zs += stabilizer
                 result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4)
                 
@@ -307,7 +307,7 @@ class Convolution(Module):
                 Z = term1 * term2
                 t1 = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
                 Zs = t1 + t2
-                stabilizer = epsilon*(tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+                stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
                 Zs += stabilizer
                 result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4)
                 
@@ -358,8 +358,8 @@ class Convolution(Module):
                 Z = term1 * term2
 
                 if not alpha == 0:
-                    Zp = tf.select(tf.greater(Z,0),Z, tf.zeros_like(Z))
-                    t2 = tf.expand_dims(tf.expand_dims(tf.select(tf.greater(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
+                    Zp = tf.where(tf.greater(Z,0),Z, tf.zeros_like(Z))
+                    t2 = tf.expand_dims(tf.expand_dims(tf.where(tf.greater(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
                     t1 = tf.expand_dims( tf.reduce_sum(Zp, 1), 1)
                     Zsp = t1 + t2
                     Ralpha = alpha * tf.reduce_sum((Zp / Zsp) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3),4)
@@ -367,8 +367,8 @@ class Convolution(Module):
                     Ralpha = 0
 
                 if not beta == 0:
-                    Zn = tf.select(tf.less(Z,0),Z, tf.zeros_like(Z))
-                    t2 = tf.expand_dims(tf.expand_dims(tf.select(tf.less(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
+                    Zn = tf.where(tf.less(Z,0),Z, tf.zeros_like(Z))
+                    t2 = tf.expand_dims(tf.expand_dims(tf.where(tf.less(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
                     t1 = tf.expand_dims( tf.reduce_sum(Zn, 1), 1)
                     Zsp = t1 + t2
                     Rbeta = beta * tf.reduce_sum((Zn / Zsp) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3),4)
