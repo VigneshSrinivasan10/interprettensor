@@ -96,11 +96,26 @@ def feed_dict(mnist, train):
 
 
 def compute_D_loss(D1, D2):
-    return tf.nn.sigmoid_cross_entropy_with_logits(D1, tf.ones(tf.shape(D1))) , tf.nn.sigmoid_cross_entropy_with_logits(D2, tf.zeros(tf.shape(D2)))
+    return tf.nn.sigmoid_cross_entropy_with_logits(logits=D1, labels=tf.ones(tf.shape(D1))) , tf.nn.sigmoid_cross_entropy_with_logits(logits=D2, labels=tf.zeros(tf.shape(D2)))
 
 def compute_G_loss(D2):
-    return tf.nn.sigmoid_cross_entropy_with_logits(D2, tf.ones(tf.shape(D2)))
-    
+    return tf.nn.sigmoid_cross_entropy_with_logits(logits=D2, labels=tf.ones(tf.shape(D2)))
+
+def visualize(relevances, images_tensor=None):
+    n,w,h, dim = relevances.shape
+    heatmaps = []
+    if images_tensor is not None:
+        assert relevances.shape==images_tensor.shape, 'Relevances shape != Images shape'
+    for h,heat in enumerate(relevances):
+        if images_tensor is not None:
+            input_image = images_tensor[h]
+            maps = render.hm_to_rgb(heat, input_image, scaling = 3, sigma = 2)
+        else:
+            maps = render.hm_to_rgb(heat, scaling = 3, sigma = 2)
+        heatmaps.append(maps)
+    R = np.array(heatmaps)
+    return tf.cast(R, tf.float32)
+
 def train():
   # Import data
   mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True)
@@ -121,34 +136,51 @@ def train():
             #pdb.set_trace()
             
             Gout = G.forward(tf.random_normal([FLAGS.batch_size, FLAGS.input_size]))
+            packed = tf.concat(2, [Gout, tf.reshape(x, Gout.get_shape().as_list())])
+            
+            tf.summary.image('Generated-Original', packed, max_outputs=FLAGS.batch_size)
+            #tf.summary.image('Original', tf.reshape(x, Gout.get_shape().as_list()))
             #pdb.set_trace()
-    with tf.variable_scope('model', reuse=True):
+            #with tf.variable_scope('model', reuse=True):
         with tf.variable_scope('discriminator') as scope:
             scope.reuse_variables()
             D2 = D.forward(Gout)
-    pdb.set_trace()
+            #pdb.set_trace()
 
-    total_params = tf.trainable_variables()
-    D_params = total_params[:D_params_num]
-    G_params = total_params[D_params_num:]
+    with tf.variable_scope('Loss'):
+        total_params = tf.trainable_variables()
+        D_params = total_params[:D_params_num]
+        G_params = total_params[D_params_num:]
+        D1_loss, D2_loss = compute_D_loss(D1, D2)
+        D_loss = D1_loss + D2_loss
+        G_loss = compute_G_loss(D2)
+        tf.summary.scalar('D_real', tf.reduce_mean(D1_loss))
+        tf.summary.scalar('D_fake', tf.reduce_mean(D2_loss))
+        tf.summary.scalar('D_loss', tf.reduce_mean(D_loss))
+        tf.summary.scalar('G_loss', tf.reduce_mean(G_loss))
 
-    D1_loss, D2_loss = compute_D_loss(D1, D2)
-    D_loss = D1_loss + D2_loss
-    D_train = D.fit(loss=D_loss,optimizer='adam', opt_params=[FLAGS.D_learning_rate, D_params])
+        
+    with tf.variable_scope('Trainer'):
+        D_train = D.fit(loss=D_loss,optimizer='adam', opt_params=[FLAGS.D_learning_rate, D_params])
+        G_train = G.fit(loss=G_loss,optimizer='adam', opt_params=[FLAGS.G_learning_rate, G_params])
 
-    G_loss = compute_G_loss(D2)
-    G_train = G.fit(loss=G_loss,optimizer='adam', opt_params=[FLAGS.G_learning_rate, G_params])
-    
-    if FLAGS.relevance_bool:
-        D_RELEVANCE = D.lrp(D2, 'simple', 1.0)
-    else:
-        D_RELEVANCE = []
+    with tf.variable_scope('relevance'):
+        if FLAGS.relevance_bool:
+            D_RELEVANCE = D.lrp(D2, 'simple', 1.0)
+            rel_packed = tf.concat(2, [Gout,D_RELEVANCE])
+            
+            #rel_imgs = visualize(D_RELEVANCE, Gout)
+            tf.summary.image('Relevance-Disc', rel_packed, max_outputs=FLAGS.batch_size)
+        else:
+            D_RELEVANCE = []
         
 
     # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
     merged = tf.summary.merge_all()
-    D_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/D')
-    G_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/G')
+    D_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/D', sess.graph)
+    G_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/G', sess.graph)
+
+    
     
     tf.global_variables_initializer().run()
     utils = Utils(sess, FLAGS.checkpoint_dir)
@@ -160,15 +192,15 @@ def train():
         inp = {x:d[0]}
         #pdb.set_trace()
         D_summary, _ , dloss, dd1 ,dd2, relevance_train= sess.run([ merged, D_train.train, D_loss, D1_loss,D2_loss,D_RELEVANCE], feed_dict=inp)
-        _ , gloss, gen_images = sess.run([G_train.train, G_loss, Gout])
-        _ , gloss, gen_images = sess.run([G_train.train, G_loss, Gout])
+        G_summary, _ , gloss, gen_images = sess.run([merged, G_train.train, G_loss, Gout], feed_dict=inp)
+        G_summary, _ , gloss, gen_images = sess.run([merged, G_train.train, G_loss, Gout], feed_dict=inp)
 
         if i%100==0:
             print(gloss.mean(), dloss.mean())
             #pdb.set_trace()
         
         D_writer.add_summary(D_summary, i)
-        #G_writer.add_summary(G_summary, i)
+        G_writer.add_summary(G_summary, i)
 
     # save model if required
     if FLAGS.save_model:

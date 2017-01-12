@@ -53,9 +53,9 @@ class Upconvolution(Module):
         #pdb.set_trace()
         inp_shape = self.input_tensor.get_shape().as_list()
         if self.pad == 'SAME':
-            output_shape = tf.pack([self.batch_size, inp_shape[1]*self.stride_size, inp_shape[1]*self.stride_size, self.output_depth])
+            output_shape = tf.stack([self.batch_size, inp_shape[1]*self.stride_size, inp_shape[1]*self.stride_size, self.output_depth])
         elif self.pad == 'VALID':
-            output_shape = tf.pack([self.batch_size, (inp_shape[1]-1)*self.stride_size+self.kernel_size,(inp_shape[2]-1)*self.stride_size+self.kernel_size, self.output_depth])
+            output_shape = tf.stack([self.batch_size, (inp_shape[1]-1)*self.stride_size+self.kernel_size,(inp_shape[2]-1)*self.stride_size+self.kernel_size, self.output_depth])
 
         self.weights_shape = [self.kernel_size, self.kernel_size, self.output_depth, self.input_depth ]
         
