@@ -106,7 +106,7 @@ class Linear(Module):
         self.R= R
         Z = tf.expand_dims(self.weights, 0) * tf.expand_dims(self.input_tensor, -1)
         Zs = tf.expand_dims(tf.reduce_sum(Z, 1), 1) + tf.expand_dims(tf.expand_dims(self.biases, 0), 0)
-        Zs += epsilon * tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs)*-1, tf.ones_like(Zs))
+        Zs += epsilon * tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs)*-1, tf.ones_like(Zs))
 
         return tf.reduce_sum((Z / Zs) * tf.expand_dims(self.R, 1),2)
 
@@ -119,8 +119,8 @@ class Linear(Module):
         Z = tf.expand_dims(self.weights, 0) * tf.expand_dims(self.input_tensor, -1)
 
         if not alpha == 0:
-            Zp = tf.select(tf.greater(Z,0),Z, tf.zeros_like(Z))
-            term2 = tf.expand_dims(tf.expand_dims(tf.select(tf.greater(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
+            Zp = tf.where(tf.greater(Z,0),Z, tf.zeros_like(Z))
+            term2 = tf.expand_dims(tf.expand_dims(tf.where(tf.greater(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
             term1 = tf.expand_dims( tf.reduce_sum(Zp, 1), 1)
             Zsp = term1 + term2
             Ralpha = alpha * tf.reduce_sum((Zp / Zsp) * tf.expand_dims(self.R, 1),2)
@@ -128,8 +128,8 @@ class Linear(Module):
             Ralpha = 0
 
         if not beta == 0:
-            Zn = tf.select(tf.less(Z,0),Z, tf.zeros_like(Z))
-            term2 = tf.expand_dims(tf.expand_dims(tf.select(tf.less(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
+            Zn = tf.where(tf.less(Z,0),Z, tf.zeros_like(Z))
+            term2 = tf.expand_dims(tf.expand_dims(tf.where(tf.less(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
             term1 = tf.expand_dims( tf.reduce_sum(Zn, 1), 1)
             Zsp = term1 + term2
             Rbeta = beta * tf.reduce_sum((Zn / Zsp) * tf.expand_dims(self.R, 1),2)

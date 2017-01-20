@@ -24,7 +24,8 @@ class Softmax(Module):
     def __init__(self, name='softmax'):
         self.name = name
         Module.__init__(self)
-    def forward(self,input_tensor, batch_size=10, img_dim=28):
+        
+    def forward(self,input_tensor):
         self.input_tensor = input_tensor
         with tf.name_scope(self.name):
             #with tf.name_scope('activations'):
@@ -41,10 +42,12 @@ class Softmax(Module):
         # just propagate R further down.
         # makes sure subroutines never get called.
         self.R = R
-        #Rx = self.R  * tf.nn.softmax(self.input_tensor)
-        Rx = self.R  * self.activations
+        #import pdb;pdb.set_trace()
+        Rx = self.input_tensor  * self.activations
+        #Rx = self.input_tensor  * self.R
+        #Rx = Rx / tf.reduce_sum(self.input_tensor)
         
-        #Rx = tf.nn.softmax(self.activations) * self.activations
+        
         tf.summary.histogram(self.name, Rx)
         return Rx
     

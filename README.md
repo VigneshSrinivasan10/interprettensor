@@ -1,8 +1,8 @@
 This is a tensorflow wrapper which provides simple and accessible stand-alone implementations of LRP for artificial neural networks.
 
 ### Requirements
-    tensorflow >= 0.12.0rc1
-    numpy == 2.7
+    tensorflow >= 1.0.0alpha
+    python == 2.7
     matplotlib >= 1.3.1
     scikit-image > 0.11.3
     

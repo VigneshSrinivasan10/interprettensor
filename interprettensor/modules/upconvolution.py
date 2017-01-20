@@ -126,7 +126,7 @@ class Upconvolution(Module):
                 Z = term1 * term2
                 t1 = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
                 Zs = t1 + t2
-                stabilizer = 1e-8*(tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+                stabilizer = 1e-8*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
                 Zs += stabilizer
                 result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.pad_input_tensor[:,i*hstride:i*hstride+hf , j*wstride:j*wstride+wf,:], -2), 4)
                 
@@ -268,7 +268,7 @@ class Upconvolution(Module):
                 Z = term1 * term2
                 t1 = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
                 Zs = t1 + t2
-                stabilizer = epsilon*(tf.select(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+                stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
                 Zs += stabilizer
                 result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 1), 4)
                 
@@ -317,8 +317,8 @@ class Upconvolution(Module):
                 Z = term1 * term2
 
                 if not alpha == 0:
-                    Zp = tf.select(tf.greater(Z,0),Z, tf.zeros_like(Z))
-                    t2 = tf.expand_dims(tf.expand_dims(tf.select(tf.greater(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
+                    Zp = tf.where(tf.greater(Z,0),Z, tf.zeros_like(Z))
+                    t2 = tf.expand_dims(tf.expand_dims(tf.where(tf.greater(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
                     t1 = tf.expand_dims( tf.reduce_sum(Zp, 1), 1)
                     Zsp = t1 + t2
                     Ralpha = alpha + tf.reduce_sum((Z / Zsp) * tf.expand_dims(self.R, 1),2)
@@ -326,8 +326,8 @@ class Upconvolution(Module):
                     Ralpha = 0
 
                 if not beta == 0:
-                    Zn = tf.select(tf.lesser(Z,0),Z, tf.zeros_like(Z))
-                    t2 = tf.expand_dims(tf.expand_dims(tf.select(tf.lesser(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
+                    Zn = tf.where(tf.lesser(Z,0),Z, tf.zeros_like(Z))
+                    t2 = tf.expand_dims(tf.expand_dims(tf.where(tf.lesser(self.biases,0),self.biases, tf.zeros_like(self.biases)), 0 ), 0)
                     t1 = tf.expand_dims( tf.reduce_sum(Zn, 1), 1)
                     Zsp = t1 + t2
                     Rbeta = beta + tf.reduce_sum((Z / Zsp) * tf.expand_dims(self.R, 1),2)

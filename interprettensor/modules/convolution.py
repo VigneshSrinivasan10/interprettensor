@@ -107,7 +107,7 @@ class Convolution(Module):
         image_patches = tf.expand_dims(tf.extract_image_patches(self.input_tensor, ksizes=[1,hf,wf,1], strides=self.strides, rates=self.strides, padding=self.pad), -1)
         filter_flatten = tf.reshape(self.weights, [1,1,1,hf*wf*df, NF])
         
-        #pdb.set_trace()
+        pdb.set_trace()
         biases_shape = self.biases.get_shape().as_list()
         for i in xrange(Hout):
             for j in xrange(Wout):

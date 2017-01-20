@@ -36,9 +36,9 @@ flags = tf.flags
 logging = tf.logging
 
 flags.DEFINE_integer("max_steps", 3501,'Number of steps to run trainer.')
-flags.DEFINE_integer("batch_size", 100,'Number of steps to run trainer.')
+flags.DEFINE_integer("batch_size", 10000,'Number of steps to run trainer.')
 flags.DEFINE_integer("test_every", 100,'Number of steps to run trainer.')
-flags.DEFINE_float("learning_rate", 0.001,'Initial learning rate')
+flags.DEFINE_float("learning_rate", 0.01,'Initial learning rate')
 flags.DEFINE_float("dropout", 0.9, 'Keep probability for training dropout.')
 flags.DEFINE_string("data_dir", 'data','Directory for storing data')
 flags.DEFINE_string("summaries_dir", 'mnist_linear_logs','Summaries directory')
@@ -54,7 +54,7 @@ FLAGS = flags.FLAGS
 def nn():
     return Sequential([Linear(input_dim=784,output_dim=500, batch_size=FLAGS.batch_size), 
                      Relu(),
-                     Linear(100), 
+                     Linear(200), 
                      Relu(),
                      Linear(10), 
                      Softmax()])
@@ -90,8 +90,8 @@ def train():
         
     with tf.variable_scope('relevance'):    
         if FLAGS.relevance_bool:
-            #RELEVANCE = net.lrp(y, 'simple')
-            RELEVANCE = net.lrp(y, 'epsilon', 1e-8)
+            RELEVANCE = net.lrp(y, 'simple')
+            #RELEVANCE = net.lrp(y, 'epsilon', 1e-8)
             #RELEVANCE = net.lrp(y, 'ww', 1e-8)
             #RELEVANCE = net.lrp(y, 'flat', 1e-8)
             #RELEVANCE = net.lrp(y, 'alphabeta', 0.5)
@@ -104,7 +104,7 @@ def train():
                 relevance_layerwise.append(R)
         else:
             RELEVANCE = []
-        
+            relevance_layerwise = []
     # Accuracy computation
     with tf.name_scope('correct_prediction'):
         correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
@@ -120,7 +120,7 @@ def train():
     utils = Utils(sess, FLAGS.checkpoint_dir)
     if FLAGS.reload_model:
         utils.reload_model()
-    pdb.set_trace()
+    #pdb.set_trace()
             
     # iterate over train and test data
     for i in range(FLAGS.max_steps):
@@ -128,9 +128,13 @@ def train():
             # pdb.set_trace()
             d = feed_dict(mnist, False)
             test_inp = {x:d[0], y_:d[1], keep_prob:d[2]}
-            summary, acc , relevance_test= sess.run([merged, accuracy, RELEVANCE], feed_dict=test_inp)
+            summary, acc , relevance_test, op, rel_layer= sess.run([merged, accuracy, RELEVANCE,y, relevance_layerwise], feed_dict=test_inp)
             test_writer.add_summary(summary, i)
             print('Accuracy at step %s: %f' % (i, acc))
+            print([np.sum(rel) for rel in rel_layer])
+            print(np.sum(relevance_test))
+            print(np.sum(op))
+
         else:
             d = feed_dict(mnist, True)
             inp = {x:d[0], y_:d[1], keep_prob:d[2]}
@@ -139,11 +143,8 @@ def train():
 
             summary, _ , relevance_train,op, rel_layer= sess.run([merged, train.train, RELEVANCE,y, relevance_layerwise], feed_dict=inp)
             train_writer.add_summary(summary, i)
-            pdb.set_trace()
-            print([np.sum(rel) for rel in rel_layer])
-            print(np.sum(relevance_train))
-            print(np.sum(op))
-
+            #pdb.set_trace()
+            
     # save model if required
     if FLAGS.save_model:
         utils.save_model()

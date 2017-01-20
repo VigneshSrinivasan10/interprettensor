@@ -36,7 +36,7 @@ import pdb
 flags = tf.flags
 logging = tf.logging
 
-flags.DEFINE_integer("max_steps", 3001,'Number of steps to run trainer.')
+flags.DEFINE_integer("max_steps", 5001,'Number of steps to run trainer.')
 flags.DEFINE_integer("batch_size", 100,'Number of steps to run trainer.')
 flags.DEFINE_integer("test_every", 500,'Number of steps to run trainer.')
 flags.DEFINE_float("learning_rate", 0.01,'Initial learning rate')
@@ -52,6 +52,18 @@ flags.DEFINE_string("checkpoint_dir", 'mnist_convolution_model','Checkpoint dir'
 FLAGS = flags.FLAGS
 
 
+def nn_():
+    
+    return Sequential([Convolution(output_depth=32,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28),
+                    Tanh(),
+                    #MaxPool(),
+                    Convolution(64),
+                    Tanh(),  
+                    # Convolution(64),
+                    # Tanh(),  
+                    #MaxPool(),
+                    Linear(10), 
+                    Softmax()])
 def nn():
     
     return Sequential([Convolution(output_depth=32,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28),
@@ -102,14 +114,15 @@ def train():
             #RELEVANCE = net.lrp(y, 'alphabeta', 0.7)
 
             relevance_layerwise = []
-            # R = y
-            # for layer in net.modules[::-1]:
-            #     R = net.lrp_layerwise(layer, R, 'simple')
-            #     relevance_layerwise.append(R)
+            R = y
+            for layer in net.modules[::-1]:
+                R = net.lrp_layerwise(layer, R, 'simple')
+                relevance_layerwise.append(R)
 
         else:
             RELEVANCE=[]
-        
+            relevance_layerwise = []
+            
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1)), tf.float32))
     tf.summary.scalar('accuracy', accuracy)
@@ -133,8 +146,7 @@ def train():
             print('Accuracy at step %s: %f' % (i, acc))
             print([np.sum(rel) for rel in rel_layer])
             print(np.sum(relevance_test))
-            #print(np.sum(op))
-    
+            
             # save model if required
             if FLAGS.save_model:
                 utils.save_model()
@@ -144,6 +156,11 @@ def train():
             inp = {x:d[0], y_: d[1], keep_prob: d[2]}
             summary, _ , relevance_train,op, rel_layer= sess.run([merged, train.train, RELEVANCE,y, relevance_layerwise], feed_dict=inp)
             train_writer.add_summary(summary, i)
+            
+
+            #print(np.sum(op))
+            #pdb.set_trace()
+            
     # relevances plotted with visually pleasing color schemes
     if FLAGS.relevance_bool:
         # plot test images with relevances overlaid
