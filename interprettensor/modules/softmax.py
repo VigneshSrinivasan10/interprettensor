@@ -42,12 +42,11 @@ class Softmax(Module):
         # just propagate R further down.
         # makes sure subroutines never get called.
         self.R = R
-        #import pdb;pdb.set_trace()
-        Rx = self.input_tensor  * self.activations
-        #Rx = self.input_tensor  * self.R
+        #Rx = self.input_tensor  * self.activations
+        Rx = self.input_tensor  * self.R
         #Rx = Rx / tf.reduce_sum(self.input_tensor)
         
-        
+        #import pdb; pdb.set_trace()
         tf.summary.histogram(self.name, Rx)
         return Rx
     

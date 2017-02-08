@@ -100,14 +100,22 @@ class Convolution(Module):
             p_left = pc/2
             p_right = pc-(pc/2)
             self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[p_top,p_bottom],[p_left, p_right],[0,0]], "CONSTANT")
-        
+        elif self.pad == 'VALID':
+            self.pad_input_tensor = self.input_tensor
+            pad_r = self.activations.get_shape().as_list()[1] - self.R.get_shape().as_list()[1] 
+            self.R = tf.pad(self.R, [[0,0],[0,pad_r],[0, pad_r],[0,0]], "CONSTANT")
+            N,Hout,Wout,NF = self.R.get_shape().as_list()
+            
         pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
         Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
         
-        image_patches = tf.expand_dims(tf.extract_image_patches(self.input_tensor, ksizes=[1,hf,wf,1], strides=self.strides, rates=self.strides, padding=self.pad), -1)
+        image_patches = tf.extract_image_patches(self.input_tensor, ksizes=[1,hf,wf,1], strides=self.strides, rates=self.strides, padding=self.pad)
+        patches_shape = image_patches.get_shape().as_list()
+        pdb.set_trace()
+        image_patches = tf.reshape(image_patches, [N,])
         filter_flatten = tf.reshape(self.weights, [1,1,1,hf*wf*df, NF])
         
-        pdb.set_trace()
+        #pdb.set_trace()
         biases_shape = self.biases.get_shape().as_list()
         for i in xrange(Hout):
             for j in xrange(Wout):
@@ -124,8 +132,12 @@ class Convolution(Module):
                 pad_right = pad_in_w - (j*wstride+wf) if ( pad_in_w - (j*wstride+wf) > 0) else 0
                 pad_left = j*wstride
                 result = tf.pad(result, [[0,0],[pad_top, pad_bottom],[pad_left, pad_right],[0,0]], "CONSTANT")
+                
                 Rx+= result
-        return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        if self.pad=='SAME':
+            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        elif self.pad =='VALID':
+            return Rx
     
     def _simple_lrp(self,R):
         '''
@@ -157,7 +169,9 @@ class Convolution(Module):
             p_left = pc/2
             p_right = pc-(pc/2)
             self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[p_top,p_bottom],[p_left, p_right],[0,0]], "CONSTANT")
-        
+        elif self.pad == 'VALID':
+            self.pad_input_tensor = self.input_tensor
+            
         pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
         Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
         
@@ -177,18 +191,87 @@ class Convolution(Module):
                 Zs += stabilizer
                 result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4)
                 
-                
+                #pdb.set_trace()
                 #pad each result to the dimension of the out
                 pad_bottom = pad_in_h - (i*hstride+hf) if( pad_in_h - (i*hstride+hf))>0 else 0
                 pad_top = i*hstride
                 pad_right = pad_in_w - (j*wstride+wf) if ( pad_in_w - (j*wstride+wf) > 0) else 0
                 pad_left = j*wstride
                 result = tf.pad(result, [[0,0],[pad_top, pad_bottom],[pad_left, pad_right],[0,0]], "CONSTANT")
+                # print(i,j)
+                # print(i*hstride, i*hstride+hf , j*wstride, j*wstride+wf)
+                # print(pad_top, pad_bottom,pad_left, pad_right)
                 Rx+= result
         #pdb.set_trace()
-        return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
-    
+        if self.pad=='SAME':
+            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        elif self.pad =='VALID':
+            return Rx
+        
     def _flat_lrp(self,R):
+        '''
+        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
+        '''
+        
+        self.R = R
+        R_shape = self.R.get_shape().as_list()
+        activations_shape = self.activations.get_shape().as_list()
+        if len(R_shape)!=4:
+            self.R = tf.reshape(self.R, activations_shape)
+
+        N,Hout,Wout,NF = self.R.get_shape().as_list()
+        hf,wf,df,NF = self.weights_shape
+        _, hstride, wstride, _ = self.strides
+
+        #out_N, out_h, out_w, out_depth = self.activations.get_shape().as_list()
+        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+
+
+        if self.pad == 'SAME':
+            pr = (Hout -1) * hstride + hf - in_h
+            pc =  (Wout -1) * wstride + wf - in_w
+
+            # pr = (out_h -1) * hstride + hf - in_h
+            # pc =  (out_w -1) * wstride + wf - in_w
+            p_top = pr/2
+            p_bottom = pr-(pr/2)
+            p_left = pc/2
+            p_right = pc-(pc/2)
+            self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[p_top,p_bottom],[p_left, p_right],[0,0]], "CONSTANT")
+        elif self.pad == 'VALID':
+            self.pad_input_tensor = self.input_tensor
+            
+        pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
+        Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
+        
+        #pdb.set_trace()
+        term1 = tf.expand_dims(self.weights, 0)
+        t2 = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.expand_dims(self.biases, 0), 0), 0),0)
+        for i in xrange(Hout):
+            for j in xrange(Wout):
+                Z = tf.ones([N, hf,wf,df,NF], dtype=tf.float32)
+                Zs = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
+                
+                result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4)
+                
+                #pdb.set_trace()
+                #pad each result to the dimension of the out
+                pad_bottom = pad_in_h - (i*hstride+hf) if( pad_in_h - (i*hstride+hf))>0 else 0
+                pad_top = i*hstride
+                pad_right = pad_in_w - (j*wstride+wf) if ( pad_in_w - (j*wstride+wf) > 0) else 0
+                pad_left = j*wstride
+                result = tf.pad(result, [[0,0],[pad_top, pad_bottom],[pad_left, pad_right],[0,0]], "CONSTANT")
+                # print(i,j)
+                # print(i*hstride, i*hstride+hf , j*wstride, j*wstride+wf)
+                # print(pad_top, pad_bottom,pad_left, pad_right)
+                Rx+= result
+        #pdb.set_trace()
+        if self.pad=='SAME':
+            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        elif self.pad =='VALID':
+            return Rx
+        
+    def __flat_lrp(self,R):
         '''
         distribute relevance for each output evenly to the output neurons' receptive fields.
         '''
@@ -211,27 +294,92 @@ class Convolution(Module):
             pr = (Hout -1) * hstride + hf - in_h
             pc =  (Wout -1) * wstride + wf - in_w
             self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[pr/2, (pr-(pr/2))],[pc/2,(pc - (pc/2))],[0,0]], "CONSTANT")
-        
+        elif self.pad == 'VALID':
+            self.pad_input_tensor = self.input_tensor
+
+        #pdb.set_trace()
         pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
         Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
-        
-        out = []
         for i in xrange(Hout):
             for j in xrange(Wout):
                 Z = tf.ones([N, hf,wf,df,NF], dtype=tf.float32)
                 Zs = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
+                
                 result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4)
                 
                 #pad each result to the dimension of the out
-                pad_right = pad_in_h - (i*hstride+hf) if( pad_in_h - (i*hstride+hf))>0 else 0
-                pad_left = i*hstride
-                pad_bottom = pad_in_w - (j*wstride+wf) if ( pad_in_w - (j*wstride+wf) > 0) else 0
-                pad_up = j*wstride
-                result = tf.pad(result, [[0,0],[pad_left, pad_right],[pad_up, pad_bottom],[0,0]], "CONSTANT")
+                pad_bottom = pad_in_h - (i*hstride+hf) if( pad_in_h - (i*hstride+hf))>0 else 0
+                pad_top = i*hstride
+                pad_right = pad_in_w - (j*wstride+wf) if ( pad_in_w - (j*wstride+wf) > 0) else 0
+                pad_left = j*wstride
+                result = tf.pad(result, [[0,0],[pad_top, pad_bottom],[pad_left, pad_right],[0,0]], "CONSTANT")
                 Rx+= result
-        return Rx[:, (pr/2):in_h+(pr/2), (pc/2):in_w+(pc/2),:]
-
+        if self.pad=='SAME':
+            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        elif self.pad =='VALID':
+            return Rx
+        
     def _ww_lrp(self,R):
+        '''
+        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
+        '''
+        
+        self.R = R
+        R_shape = self.R.get_shape().as_list()
+        activations_shape = self.activations.get_shape().as_list()
+        if len(R_shape)!=4:
+            self.R = tf.reshape(self.R, activations_shape)
+
+        N,Hout,Wout,NF = self.R.get_shape().as_list()
+        hf,wf,df,NF = self.weights_shape
+        _, hstride, wstride, _ = self.strides
+
+        #out_N, out_h, out_w, out_depth = self.activations.get_shape().as_list()
+        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+
+
+        if self.pad == 'SAME':
+            pr = (Hout -1) * hstride + hf - in_h
+            pc =  (Wout -1) * wstride + wf - in_w
+
+            # pr = (out_h -1) * hstride + hf - in_h
+            # pc =  (out_w -1) * wstride + wf - in_w
+            p_top = pr/2
+            p_bottom = pr-(pr/2)
+            p_left = pc/2
+            p_right = pc-(pc/2)
+            self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[p_top,p_bottom],[p_left, p_right],[0,0]], "CONSTANT")
+        elif self.pad == 'VALID':
+            self.pad_input_tensor = self.input_tensor
+            
+        pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
+        Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
+        
+        #pdb.set_trace()
+        term1 = tf.expand_dims(self.weights, 0)
+        t2 = tf.expand_dims(tf.expand_dims(tf.expand_dims(tf.expand_dims(self.biases, 0), 0), 0),0)
+        for i in xrange(Hout):
+            for j in xrange(Wout):
+                Z = tf.square(tf.expand_dims(self.weights, 0))  
+                Zs = tf.reduce_sum(Z, [1,2,3], keep_dims=True) 
+
+                result = tf.reduce_sum((Z/Zs) * tf.expand_dims(self.R[:,i:i+1,j:j+1,:], 3), 4)
+                
+                #pdb.set_trace()
+                #pad each result to the dimension of the out
+                pad_bottom = pad_in_h - (i*hstride+hf) if( pad_in_h - (i*hstride+hf))>0 else 0
+                pad_top = i*hstride
+                pad_right = pad_in_w - (j*wstride+wf) if ( pad_in_w - (j*wstride+wf) > 0) else 0
+                pad_left = j*wstride
+                result = tf.pad(result, [[0,0],[pad_top, pad_bottom],[pad_left, pad_right],[0,0]], "CONSTANT")
+                Rx+= result
+        #pdb.set_trace()
+        if self.pad=='SAME':
+            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        elif self.pad =='VALID':
+            return Rx
+
+    def __ww_lrp(self,R):
         '''
         LRP according to Eq(12) in DOI: 10.1371/journal.pone.0130140
         '''
@@ -253,6 +401,10 @@ class Convolution(Module):
             pr = (Hout -1) * hstride + hf - in_h
             pc =  (Wout -1) * wstride + wf - in_w
             self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[pr/2, (pr-(pr/2))],[pc/2,(pc - (pc/2))],[0,0]], "CONSTANT")
+        elif self.pad == 'VALID':
+            self.pad_input_tensor = self.input_tensor
+
+            
         pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
         Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
         
@@ -270,13 +422,17 @@ class Convolution(Module):
                 pad_up = j*wstride
                 result = tf.pad(result, [[0,0],[pad_left, pad_right],[pad_up, pad_bottom],[0,0]], "CONSTANT")
                 Rx+= result
-        return Rx[:, (pr/2):in_h+(pr/2), (pc/2):in_w+(pc/2),:]
+        if self.pad=='SAME':
+            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        elif self.pad =='VALID':
+            return Rx
+        
 
     def _epsilon_lrp(self,R, epsilon):
         '''
         LRP according to Eq(58) in DOI: 10.1371/journal.pone.0130140
         '''
-
+        #pdb.set_trace()
         self.R = R
         R_shape = self.R.get_shape().as_list()
         if len(R_shape)!=4:
@@ -294,7 +450,9 @@ class Convolution(Module):
             pr = (Hout -1) * hstride + hf - in_h
             pc =  (Wout -1) * wstride + wf - in_w
             self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[pr/2, (pr-(pr/2))],[pc/2,(pc - (pc/2))],[0,0]], "CONSTANT")
-        
+        elif self.pad == 'VALID':
+            self.pad_input_tensor = self.input_tensor
+
         pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
         Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
         
@@ -318,8 +476,12 @@ class Convolution(Module):
                 pad_up = j*wstride
                 result = tf.pad(result, [[0,0],[pad_left, pad_right],[pad_up, pad_bottom],[0,0]], "CONSTANT")
                 Rx+= result
-        return Rx[:, (pr/2):in_h+(pr/2), (pc/2):in_w+(pc/2),:]
-
+                
+        if self.pad=='SAME':
+            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        elif self.pad =='VALID':
+            return Rx
+        
 
     def _alphabeta_lrp(self,R, alpha):
         '''
@@ -344,7 +506,9 @@ class Convolution(Module):
             pr = (Hout -1) * hstride + hf - in_h
             pc =  (Wout -1) * wstride + wf - in_w
             self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[pr/2, (pr-(pr/2))],[pc/2,(pc - (pc/2))],[0,0]], "CONSTANT")
-        
+        elif self.pad == 'VALID':
+            self.pad_input_tensor = self.input_tensor
+
         pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
         Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
         
@@ -386,4 +550,8 @@ class Convolution(Module):
                 #print pad_bottom, pad_left, pad_right, pad_up
                 #pdb.set_trace()
                 Rx+= result
-        return Rx[:, (pr/2):in_h+(pr/2), (pc/2):in_w+(pc/2),:]
+
+        if self.pad=='SAME':
+            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+        elif self.pad =='VALID':
+            return Rx

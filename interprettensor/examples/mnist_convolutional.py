@@ -17,6 +17,7 @@ from __future__ import print_function
 
 import sys
 sys.path.append("..")
+sys.path.append('/home/srinivasan/Projects/lrp_toolbox/models/MNIST/')
 from modules.sequential import Sequential
 from modules.linear import Linear
 from modules.softmax import Softmax
@@ -32,12 +33,13 @@ import input_data
 import tensorflow as tf
 import numpy as np
 import pdb
+import scipy.io as sio
 
 flags = tf.flags
 logging = tf.logging
 
 flags.DEFINE_integer("max_steps", 5001,'Number of steps to run trainer.')
-flags.DEFINE_integer("batch_size", 100,'Number of steps to run trainer.')
+flags.DEFINE_integer("batch_size", 1000,'Number of steps to run trainer.')
 flags.DEFINE_integer("test_every", 500,'Number of steps to run trainer.')
 flags.DEFINE_float("learning_rate", 0.01,'Initial learning rate')
 flags.DEFINE_float("dropout", 0.9, 'Keep probability for training dropout.')
@@ -47,7 +49,9 @@ flags.DEFINE_boolean("relevance_bool", False,'Compute relevances')
 flags.DEFINE_string("relevance_method", 'simple','relevance methods: simple/eps/w^2/alphabeta')
 flags.DEFINE_boolean("save_model", False,'Save the trained model')
 flags.DEFINE_boolean("reload_model", False,'Restore the trained model')
-flags.DEFINE_string("checkpoint_dir", 'mnist_convolution_model','Checkpoint dir')
+#flags.DEFINE_string("checkpoint_dir", 'mnist_convolution_model','Checkpoint dir')
+flags.DEFINE_string("checkpoint_dir", 'mnist_trained_model','Checkpoint dir')
+flags.DEFINE_string("checkpoint_reload_dir", 'mnist_trained_model','Checkpoint dir')
 
 FLAGS = flags.FLAGS
 
@@ -66,7 +70,24 @@ def nn_():
                     Softmax()])
 def nn():
     
-    return Sequential([Convolution(output_depth=32,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28),
+    return Sequential([Convolution(output_depth=10,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28, stride_size=1, pad='VALID'),
+                       Relu(),
+                       AvgPool(),
+
+                       Convolution(output_depth=25,stride_size=1, pad='VALID'),
+                       Relu(),
+                       AvgPool(),
+                       
+                       Convolution(kernel_size=4,output_depth=100,stride_size=1, pad='VALID'),
+                       Relu(),
+                       AvgPool(),
+                       
+                       Convolution(kernel_size=1, output_depth=10,stride_size=1, pad='VALID'),
+                       Softmax()])
+
+
+def nn__():    
+    return Sequential([Convolution(output_depth=10,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28),
                     Tanh(),
                     MaxPool(),
                     Convolution(64),
@@ -103,21 +124,24 @@ def train():
     
     with tf.variable_scope('model'):
         net = nn()
-        y = net.forward(x)
+        inp = tf.pad(tf.reshape(x, [FLAGS.batch_size,28,28,1]), [[0,0],[2,2],[2,2],[0,0]])
+        op = net.forward(inp)
+        y = tf.squeeze(op)
+        
         train = net.fit(output=y,ground_truth=y_,loss='softmax_crossentropy',optimizer='adam', opt_params=[FLAGS.learning_rate])
     with tf.variable_scope('relevance'):
         if FLAGS.relevance_bool:
-            #RELEVANCE = net.lrp(y, FLAGS.relevance_method, 1.0)
-            RELEVANCE = net.lrp(y, 'simple', 1e-8)
-            #RELEVANCE = net.lrp(y, 'ww', 0)
-            #RELEVANCE = net.lrp(y, 'flat', 0)
-            #RELEVANCE = net.lrp(y, 'alphabeta', 0.7)
+            RELEVANCE = net.lrp(op, FLAGS.relevance_method, 1.0)
+            #RELEVANCE = net.lrp(op, 'epsilon', 1e-3)
+            #RELEVANCE = net.lrp(op, 'ww', 0)
+            #RELEVANCE = net.lrp(op, 'flat', 0)
+            #RELEVANCE = net.lrp(op, 'alphabeta', 0.7)
 
             relevance_layerwise = []
-            R = y
-            for layer in net.modules[::-1]:
-                R = net.lrp_layerwise(layer, R, 'simple')
-                relevance_layerwise.append(R)
+            # R = y
+            # for layer in net.modules[::-1]:
+            #     R = net.lrp_layerwise(layer, R, 'simple')
+            #     relevance_layerwise.append(R)
 
         else:
             RELEVANCE=[]
@@ -133,8 +157,11 @@ def train():
     test_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/test')
 
     tf.global_variables_initializer().run()
-    utils = Utils(sess, FLAGS.checkpoint_dir)
+    
+    utils = Utils(sess, FLAGS.checkpoint_reload_dir)
+    #tvars = np.load(FLAGS.checkpoint_reload_dir)
     if FLAGS.reload_model:
+        #for ii in range(8): sess.run(tf.trainable_variables()[ii].assign(tvars[ii]))
         utils.reload_model()
 
     for i in range(FLAGS.max_steps):
@@ -159,10 +186,13 @@ def train():
             
 
             #print(np.sum(op))
-            #pdb.set_trace()
+    #pdb.set_trace()
             
     # relevances plotted with visually pleasing color schemes
     if FLAGS.relevance_bool:
+        #pdb.set_trace()
+        relevance_test = relevance_test[:,2:30,2:30,:]
+        relevance_train = relevance_train[:,2:30,2:30,:]
         # plot test images with relevances overlaid
         images = test_inp[test_inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
         #images = (images + 1)/2.0

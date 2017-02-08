@@ -43,7 +43,7 @@ def vec2im(V, shape = () ):
 
     if len(shape) < 2:
         shape = [np.sqrt(V.size)]*2
-
+        shape = map(int, shape)
     return np.reshape(V, shape)
 
 

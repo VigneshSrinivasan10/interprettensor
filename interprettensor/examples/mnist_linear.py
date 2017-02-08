@@ -36,7 +36,7 @@ flags = tf.flags
 logging = tf.logging
 
 flags.DEFINE_integer("max_steps", 3501,'Number of steps to run trainer.')
-flags.DEFINE_integer("batch_size", 10000,'Number of steps to run trainer.')
+flags.DEFINE_integer("batch_size", 1000,'Number of steps to run trainer.')
 flags.DEFINE_integer("test_every", 100,'Number of steps to run trainer.')
 flags.DEFINE_float("learning_rate", 0.01,'Initial learning rate')
 flags.DEFINE_float("dropout", 0.9, 'Keep probability for training dropout.')
@@ -56,7 +56,7 @@ def nn():
                      Relu(),
                      Linear(200), 
                      Relu(),
-                     Linear(10), 
+                     Linear(10, keep_prob=0.8), 
                      Softmax()])
 
 

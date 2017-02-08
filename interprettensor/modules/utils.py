@@ -17,7 +17,7 @@ import tensorflow as tf
 def visualize(relevances, images_tensor=None, name=''):
     n,w,h, dim = relevances.shape
     heatmaps = []
-
+    #import pdb;pdb.set_trace()
     if images_tensor is not None:
         assert relevances.shape==images_tensor.shape, 'Relevances shape != Images shape'
     for h,heat in enumerate(relevances):
