@@ -100,7 +100,7 @@ class Convolution(Module):
         '''
         LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
         '''
-        #import time; start_time = time.time()
+        import time; start_time = time.time()
         
         self.R = R
         R_shape = self.R.get_shape().as_list()
@@ -111,46 +111,124 @@ class Convolution(Module):
         N,Hout,Wout,NF = self.R.get_shape().as_list()
         hf,wf,df,NF = self.weights_shape
         _, hstride, wstride, _ = self.strides
-
-        #out_N, out_h, out_w, out_depth = self.activations.get_shape().as_list()
         in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
-        if self.pad == 'SAME':
-            pr = (Hout -1) * hstride + hf - in_h
-            pc =  (Wout -1) * wstride + wf - in_w
-            p_top = pr/2
-            p_bottom = pr-(pr/2)
-            p_left = pc/2
-            p_right = pc-(pc/2)
-            self.pad_input_tensor = tf.pad(self.input_tensor, [[0,0],[p_top,p_bottom],[p_left, p_right],[0,0]], "CONSTANT")
-        elif self.pad == 'VALID':
-            self.pad_input_tensor = self.input_tensor
-            pad_r = self.activations.get_shape().as_list()[1] - self.R.get_shape().as_list()[1] 
-            self.R = tf.pad(self.R, [[0,0],[0,pad_r],[0, pad_r],[0,0]], "CONSTANT")
-            N,Hout,Wout,NF = self.R.get_shape().as_list()
-            
-        pad_in_N, pad_in_h, pad_in_w, pad_in_depth = self.pad_input_tensor.get_shape().as_list()
-        Rx = tf.zeros_like(self.pad_input_tensor, dtype = tf.float32)
-        
+
         op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding='VALID')
         p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
         image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
         
-        #biases_shape = self.biases.get_shape().as_list()
         Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
-        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True) 
+        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
         stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
         Zs += stabilizer
         result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
         Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
         
-        # total_time = time.time() - start_time
-        # print(total_time)
+        total_time = time.time() - start_time
+        print(total_time)
+        return Rx
+
+    def _epsilon_lrp(self,R, epsilon):
+        '''
+        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
+        '''
+        import time; start_time = time.time()
         
-        if self.pad=='SAME':
-            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
-        elif self.pad =='VALID':
-            return Rx
+        self.R = R
+        R_shape = self.R.get_shape().as_list()
+        activations_shape = self.activations.get_shape().as_list()
+        if len(R_shape)!=4:
+            self.R = tf.reshape(self.R, activations_shape)
+
+        N,Hout,Wout,NF = self.R.get_shape().as_list()
+        hf,wf,df,NF = self.weights_shape
+        _, hstride, wstride, _ = self.strides
+        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+
+        op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding='VALID')
+        p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
+        image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
+        
+        Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
+        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+        Zs += stabilizer
+        result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
+        Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
+        
+        total_time = time.time() - start_time
+        print(total_time)
+        return Rx
+
+    def _ww_lrp(self,R):
+        '''
+        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
+        '''
+        import time; start_time = time.time()
+        
+        self.R = R
+        R_shape = self.R.get_shape().as_list()
+        activations_shape = self.activations.get_shape().as_list()
+        if len(R_shape)!=4:
+            self.R = tf.reshape(self.R, activations_shape)
+
+        N,Hout,Wout,NF = self.R.get_shape().as_list()
+        hf,wf,df,NF = self.weights_shape
+        _, hstride, wstride, _ = self.strides
+        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+
+        op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding='VALID')
+        p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
+        #image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
+        image_patches = tf.ones([p_bs,p_h,p_w, hf, wf, in_depth])
+        
+        
+        Z = tf.square(tf.expand_dims(self.weights, 0)) * tf.expand_dims( image_patches, -1)
+        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+        Zs += stabilizer
+        result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
+        Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
+        
+        total_time = time.time() - start_time
+        print(total_time)
+        return Rx
+
+    def _flat_lrp(self,R):
+        '''
+        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
+        '''
+        import time; start_time = time.time()
+        
+        self.R = R
+        R_shape = self.R.get_shape().as_list()
+        activations_shape = self.activations.get_shape().as_list()
+        if len(R_shape)!=4:
+            self.R = tf.reshape(self.R, activations_shape)
+
+        N,Hout,Wout,NF = self.R.get_shape().as_list()
+        hf,wf,df,NF = self.weights_shape
+        _, hstride, wstride, _ = self.strides
+        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+
+        op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding='VALID')
+        p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
+        #image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
+        image_patches = tf.ones([p_bs,p_h,p_w, hf, wf, in_depth])
+        
+        
+        Z = tf.expand_dims( image_patches, -1)
+        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+        Zs += stabilizer
+        result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
+        Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
+        
+        total_time = time.time() - start_time
+        print(total_time)
+        return Rx
     
+    # OLD METHODS BELOW
     def __simple_lrp(self,R):
         '''
         LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
@@ -223,7 +301,7 @@ class Convolution(Module):
         elif self.pad =='VALID':
             return Rx
         
-    def _flat_lrp(self,R):
+    def __flat_lrp(self,R):
         '''
         LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
         '''
@@ -286,7 +364,7 @@ class Convolution(Module):
         elif self.pad =='VALID':
             return Rx
         
-    def _ww_lrp(self,R):
+    def __ww_lrp(self,R):
         '''
         LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
         '''
@@ -346,7 +424,7 @@ class Convolution(Module):
         elif self.pad =='VALID':
             return Rx
 
-    def _epsilon_lrp(self,R, epsilon):
+    def __epsilon_lrp(self,R, epsilon):
         '''
         LRP according to Eq(58) in DOI: 10.1371/journal.pone.0130140
         '''
@@ -474,17 +552,8 @@ class Convolution(Module):
         elif self.pad =='VALID':
             return Rx
         
-    def patches_to_images(self, grad, in_N, in_h, in_w, in_depth, out_h, out_w, hf,wf, hstride,wstride ):
-        batch_size = in_N
-        rows_in = in_h
-        cols_in = in_w
-        channels = in_depth
-        rows_out = out_h
-        cols_out = out_w
-        ksize_r = hf
-        ksize_c = wf
-        stride_r = wstride
-        stride_h = hstride
+    #def patches_to_images(self, grad, in_N, in_h, in_w, in_depth, out_h, out_w, hf,wf, hstride,wstride ):
+    def patches_to_images(self, grad, batch_size, rows_in, cols_in, channels, rows_out, cols_out, ksize_r, ksize_c, stride_h, stride_r ):
         rate_r = 1
         rate_c = 1
         padding = self.pad
