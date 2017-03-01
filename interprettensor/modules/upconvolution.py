@@ -14,6 +14,7 @@
 import tensorflow as tf
 from module import Module
 import variables
+import activations
 import pdb
 
 class Upconvolution(Module):
@@ -22,7 +23,7 @@ class Upconvolution(Module):
     Convolutional transpose Layer
     '''
 
-    def __init__(self, output_depth, input_depth=None, batch_size=None, input_dim=None, kernel_size=5, stride_size=2, keep_prob=1.0, pad = 'SAME',name="deconv2d"):
+    def __init__(self, output_depth, input_depth=None, batch_size=None, input_dim=None, kernel_size=5, stride_size=2, act = 'linear', keep_prob=1.0, pad = 'SAME',name="deconv2d"):
         self.name = name
         Module.__init__(self)
         
@@ -34,6 +35,7 @@ class Upconvolution(Module):
         self.kernel_size = kernel_size
         self.stride_size = stride_size
         self.keep_prob = keep_prob
+        self.act = act
         self.pad = pad
         
     def check_input_shape(self):
@@ -69,7 +71,13 @@ class Upconvolution(Module):
             #pdb.set_trace()
             #deconv = tf.nn.atrous_conv2d(self.input_tensor, self.weights, rate=2, padding='SAME')
             deconv = tf.nn.conv2d_transpose(self.input_tensor, self.weights, output_shape=output_shape, strides = self.strides, padding=self.pad)
-            self.activations = tf.reshape(tf.nn.bias_add(deconv, self.biases), [-1]+deconv.get_shape().as_list()[1:])
+            deconv = tf.reshape(tf.nn.bias_add(deconv, self.biases), [-1]+deconv.get_shape().as_list()[1:])
+            
+            if isinstance(self.act, str): 
+                self.activations = activations.apply(deconv, self.act)
+            elif hasattr(self.act, '__call__'):
+                self.activations = self.act(conv)
+
             if self.keep_prob<1.0:
                 self.activations = tf.nn.dropout(self.activations, keep_prob=self.keep_prob)
             tf.summary.histogram('activations', self.activations)

@@ -24,7 +24,7 @@ from modules.relu import Relu
 from modules.tanh import Tanh
 from modules.sigmoid import Sigmoid
 from modules.convolution import Convolution
-from modules.upconvolution import Upconvolution
+from modules.upconvolution import Upconvolution as Tconvolution
 import modules.render as render
 
 from modules.avgpool import AvgPool
@@ -60,22 +60,29 @@ FLAGS = flags.FLAGS
 
 
 def discriminator():
-    return Sequential([Convolution(input_depth=1,output_depth=32,act = 'tanh',batch_size=FLAGS.batch_size,input_dim=28), 
+    return Sequential([Convolution(input_depth=1,output_depth=32,batch_size=FLAGS.batch_size,input_dim=28), 
                      MaxPool(),
-                     Convolution(output_depth=64, act='tanh'),
+                     Tanh(),
+                     Convolution(output_depth=64),
                      MaxPool(),
+                     Tanh(),  
                      Linear(1)])
                      
 
 def generator():
     #pdb.set_trace()
-    return Sequential([Linear(input_dim=1024, output_dim=7*7*128, act='tanh', batch_size=FLAGS.batch_size),
-                       Convolution(input_dim=7,input_depth=128,output_depth=32, act='tanh'), #4x4
-                       Upconvolution(output_depth=128, kernel_size=3), #8x8
-                       Upconvolution(output_depth=256, kernel_size=5, stride_size=1, act='tanh', pad='VALID'), #12x12
-                       Upconvolution(output_depth=32, kernel_size=3, act='tanh'), #24X24 
-                       Upconvolution(output_depth=1, kernel_size=5, stride_size=1, act='tanh', pad='VALID'), #28X28
-                   ])
+    return Sequential([Linear(input_dim=1024, output_dim=7*7*128, batch_size=FLAGS.batch_size),
+                       Tanh(),
+                       Convolution(input_dim=7,input_depth=128,output_depth=32), #4x4
+                       Tanh(),
+                       Tconvolution(output_depth=128, kernel_size=3), #8x8
+                       Tanh(),
+                       Tconvolution(output_depth=256, kernel_size=5, stride_size=1, pad='VALID'), #12x12
+                       Tanh(),
+                       Tconvolution(output_depth=32, kernel_size=3), #24X24 
+                       Tanh(),
+                       Tconvolution(output_depth=1, kernel_size=5, stride_size=1, pad='VALID'), #28X28
+                       Tanh()])
 
 
 def feed_dict(mnist, train):
@@ -94,7 +101,20 @@ def compute_D_loss(D1, D2):
 def compute_G_loss(D2):
     return tf.nn.sigmoid_cross_entropy_with_logits(logits=D2, labels=tf.ones(tf.shape(D2)))
 
-
+def visualize(relevances, images_tensor=None):
+    n,w,h, dim = relevances.shape
+    heatmaps = []
+    if images_tensor is not None:
+        assert relevances.shape==images_tensor.shape, 'Relevances shape != Images shape'
+    for h,heat in enumerate(relevances):
+        if images_tensor is not None:
+            input_image = images_tensor[h]
+            maps = render.hm_to_rgb(heat, input_image, scaling = 3, sigma = 2)
+        else:
+            maps = render.hm_to_rgb(heat, scaling = 3, sigma = 2)
+        heatmaps.append(maps)
+    R = np.array(heatmaps)
+    return tf.cast(R, tf.float32)
 
 def train():
   # Import data
@@ -104,59 +124,65 @@ def train():
     # Input placeholders
     with tf.name_scope('input'):
         x = tf.placeholder(tf.float32, [FLAGS.batch_size, 784], name='x-input')
-        
+        #pdb.set_trace()
     # Model definition along with training and relevances
     with tf.variable_scope('model'):
         with tf.variable_scope('discriminator'):
             D = discriminator()
-            D1 = D.forward(x) # Run the Discriminator with the True data distribution
+            D1 = D.forward(x)
             D_params_num = len(tf.trainable_variables())
         with tf.variable_scope('generator'):
             G = generator()
-            Gout = G.forward(tf.random_normal([FLAGS.batch_size, FLAGS.input_size])) # Run the generator to get Fake data 
+            #pdb.set_trace()
             
+            Gout = G.forward(tf.random_normal([FLAGS.batch_size, FLAGS.input_size]))
+            packed = tf.concat(2, [Gout, tf.reshape(x, Gout.get_shape().as_list())])
+            
+            tf.summary.image('Generated-Original', packed, max_outputs=FLAGS.batch_size)
+            #tf.summary.image('Original', tf.reshape(x, Gout.get_shape().as_list()))
+            #pdb.set_trace()
+            #with tf.variable_scope('model', reuse=True):
         with tf.variable_scope('discriminator') as scope:
             scope.reuse_variables()
-            D2 = D.forward(Gout) # Run the Discriminator with the Fake data distribution
-        
-        # Image summaries        
-        packed = tf.concat([Gout, tf.reshape(x, Gout.get_shape().as_list())],2)
-        tf.summary.image('Generated-Original', packed, max_outputs=FLAGS.batch_size)
-        #tf.summary.image('Original', tf.reshape(x, Gout.get_shape().as_list()))
-
-    # Extract respective parameters
-    total_params = tf.trainable_variables()
-    D_params = total_params[:D_params_num]
-    G_params = total_params[D_params_num:]
+            D2 = D.forward(Gout)
+            #pdb.set_trace()
 
     with tf.variable_scope('Loss'):
-        # Compute every loss
-        D1_loss, D2_loss = compute_D_loss(D1, D2) 
-        D_loss = tf.reduce_mean(D1_loss + D2_loss)
+        total_params = tf.trainable_variables()
+        D_params = total_params[:D_params_num]
+        G_params = total_params[D_params_num:]
+        D1_loss, D2_loss = compute_D_loss(D1, D2)
+        D_loss = D1_loss + D2_loss
         G_loss = compute_G_loss(D2)
-        # Loss summaries
         tf.summary.scalar('D_real', tf.reduce_mean(D1_loss))
         tf.summary.scalar('D_fake', tf.reduce_mean(D2_loss))
         tf.summary.scalar('D_loss', tf.reduce_mean(D_loss))
         tf.summary.scalar('G_loss', tf.reduce_mean(G_loss))
 
-
-    # Create Trainers (Optimizers) for each network giving respective loss and weight parameters
+        
     with tf.variable_scope('Trainer'):
-        D_trainer = D.fit(loss=D_loss,optimizer='adam', opt_params=[FLAGS.D_learning_rate, D_params])
-        G_trainer = G.fit(loss=G_loss,optimizer='adam', opt_params=[FLAGS.G_learning_rate, G_params])
+        D_train = D.fit(loss=D_loss,optimizer='adam', opt_params=[FLAGS.D_learning_rate, D_params])
+        G_train = G.fit(loss=G_loss,optimizer='adam', opt_params=[FLAGS.G_learning_rate, G_params])
 
+    with tf.variable_scope('relevance'):
+        if FLAGS.relevance_bool:
+            D_RELEVANCE = D.lrp(D2, 'simple', 1.0)
+            rel_packed = tf.concat(2, [Gout,D_RELEVANCE])
+            
+            #rel_imgs = visualize(D_RELEVANCE, Gout)
+            tf.summary.image('Relevance-Disc', rel_packed, max_outputs=FLAGS.batch_size)
+        else:
+            D_RELEVANCE = []
+        
 
-    # create summaries files for D and G -
-    # this is the main summaries file
-    # it will store all the variables mentioned above for creating summaries
+    # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
     merged = tf.summary.merge_all()
     D_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/D', sess.graph)
     G_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/G', sess.graph)
 
-    # Init all variables
-    tf.global_variables_initializer().run()
     
+    
+    tf.global_variables_initializer().run()
     utils = Utils(sess, FLAGS.checkpoint_dir)
     if FLAGS.reload_model:
         utils.reload_model()
@@ -164,15 +190,15 @@ def train():
     for i in range(FLAGS.max_steps):
         d = feed_dict(mnist, True)
         inp = {x:d[0]}
-        # Run D once and G twice
-        D_summary, _ , dloss, dd1 ,dd2 = sess.run([ merged, D_trainer.train, D_loss, D1_loss,D2_loss], feed_dict=inp)
-        G_summary, _ , gloss, gen_images = sess.run([merged, G_trainer.train, G_loss, Gout], feed_dict=inp)
-        G_summary, _ , gloss, gen_images = sess.run([merged, G_trainer.train, G_loss, Gout], feed_dict=inp)
+        #pdb.set_trace()
+        D_summary, _ , dloss, dd1 ,dd2, relevance_train= sess.run([ merged, D_train.train, D_loss, D1_loss,D2_loss,D_RELEVANCE], feed_dict=inp)
+        G_summary, _ , gloss, gen_images = sess.run([merged, G_train.train, G_loss, Gout], feed_dict=inp)
+        G_summary, _ , gloss, gen_images = sess.run([merged, G_train.train, G_loss, Gout], feed_dict=inp)
 
         if i%100==0:
             print(gloss.mean(), dloss.mean())
-
-        # Add summaries
+            #pdb.set_trace()
+        
         D_writer.add_summary(D_summary, i)
         G_writer.add_summary(G_summary, i)
 
@@ -180,6 +206,11 @@ def train():
     if FLAGS.save_model:
         utils.save_model()
         
+    # relevances plotted with visually pleasing color schemes
+    if FLAGS.relevance_bool:
+        # plot images with relevances overlaid
+        images = (gen_images + 1)/2.0
+        plot_relevances(relevance_train, images, D_writer )
 
     D_writer.close()
     G_writer.close()
