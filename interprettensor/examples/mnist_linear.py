@@ -41,7 +41,7 @@ flags.DEFINE_integer("test_every", 100,'Number of steps to run trainer.')
 flags.DEFINE_float("learning_rate", 0.01,'Initial learning rate')
 flags.DEFINE_float("dropout", 0.9, 'Keep probability for training dropout.')
 flags.DEFINE_string("data_dir", 'data','Directory for storing data')
-flags.DEFINE_string("summaries_dir", 'mnist_linear_logs','Summaries directory')
+flags.DEFINE_string("summaries_dir", 'mnist_linear_new_logs','Summaries directory')
 flags.DEFINE_boolean("relevance_bool", False,'Compute relevances')
 flags.DEFINE_boolean("save_model", False,'Save the trained model')
 flags.DEFINE_boolean("reload_model", False,'Restore the trained model')
@@ -52,11 +52,10 @@ FLAGS = flags.FLAGS
 
 
 def nn():
-    return Sequential([Linear(input_dim=784,output_dim=500, batch_size=FLAGS.batch_size), 
-                     Relu(),
-                     Linear(200), 
-                     Relu(),
-                     Linear(10, keep_prob=0.8), 
+    return Sequential([Linear(input_dim=784,output_dim=1296, act ='relu', batch_size=FLAGS.batch_size),
+                     Linear(1296, act ='relu'), 
+                     Linear(1296, act ='relu'),
+                     Linear(10, act ='relu'),
                      Softmax()])
 
 
@@ -86,7 +85,7 @@ def train():
         net = nn()
         y = net.forward(x)
         #with tf.variable_scope('trainer'):
-        train = net.fit(output=y,ground_truth=y_,loss='softmax_crossentropy',optimizer='adam', opt_params=[FLAGS.learning_rate])
+        
         
     with tf.variable_scope('relevance'):    
         if FLAGS.relevance_bool:
@@ -117,10 +116,19 @@ def train():
     test_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/test')
 
     tf.global_variables_initializer().run()
+    pdb.set_trace()
+    # tvars = np.load('/home/srinivasan/Projects/interprettensor/interprettensor/examples/mnist_linear_model/model.npy')
+    # for ii in range(8): sess.run(tf.trainable_variables()[ii].assign(tvars[ii]))
+    
     utils = Utils(sess, FLAGS.checkpoint_dir)
     if FLAGS.reload_model:
         utils.reload_model()
-    #pdb.set_trace()
+
+    trainer = net.fit(output=y,ground_truth=y_,loss='softmax_crossentropy',optimizer='adam', opt_params=[FLAGS.learning_rate])
+
+    uninit_vars = set(tf.global_variables()) - set(tf.trainable_variables())
+    tf.variables_initializer(uninit_vars).run()
+   
             
     # iterate over train and test data
     for i in range(FLAGS.max_steps):
@@ -145,9 +153,6 @@ def train():
             train_writer.add_summary(summary, i)
             #pdb.set_trace()
             
-    # save model if required
-    if FLAGS.save_model:
-        utils.save_model()
 
     # relevances plotted with visually pleasing color schemes
     if FLAGS.relevance_bool:
@@ -156,9 +161,9 @@ def train():
         images = (images + 1)/2.0
         plot_relevances(relevance_test.reshape([FLAGS.batch_size,28,28,1]), images, test_writer )
         # plot train images with relevances overlaid
-        images = inp[inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
-        images = (images + 1)/2.0
-        plot_relevances(relevance_train.reshape([FLAGS.batch_size,28,28,1]), images, train_writer )
+        # images = inp[inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
+        # images = (images + 1)/2.0
+        # plot_relevances(relevance_train.reshape([FLAGS.batch_size,28,28,1]), images, train_writer )
 
     train_writer.close()
     test_writer.close()

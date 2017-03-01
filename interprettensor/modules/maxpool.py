@@ -57,7 +57,7 @@ class MaxPool(Module):
 
         out_N, out_rows, out_cols, out_depth = self.activations.get_shape().as_list()
         in_N, in_rows, in_cols, in_depth = self.input_tensor.get_shape().as_list()
-
+        
         if self.pad == 'SAME':
             pr = (Hout -1) * hstride + hf - in_rows
             pc =  (Wout -1) * wstride + wf - in_cols
@@ -78,16 +78,16 @@ class MaxPool(Module):
                 Zs = tf.reduce_sum(Z, [1,2], keep_dims=True)
                 result = (Z/Zs) * self.R[:,i:i+1,j:j+1,:]
                 #pad each result to the dimension of the out
-                pad_bottom = pad_in_h - (i*hstride+hf) if( pad_in_h - (i*hstride+hf))>0 else 0
-                pad_top = i*hstride
-                pad_right = pad_in_w - (j*wstride+wf) if ( pad_in_w - (j*wstride+wf) > 0) else 0
-                pad_left = j*wstride
-                result = tf.pad(result, [[0,0],[pad_top, pad_bottom],[pad_left, pad_right],[0,0]], "CONSTANT")
+                pad_right = pad_in_rows - (i*hstride+hf) if( pad_in_rows - (i*hstride+hf))>0 else 0
+                pad_left = i*hstride
+                pad_bottom = pad_in_cols - (j*wstride+wf) if ( pad_in_cols - (j*wstride+wf) > 0) else 0
+                pad_up = j*wstride
+                result = tf.pad(result, [[0,0],[pad_left, pad_right],[pad_up, pad_bottom],[0,0]], "CONSTANT")
                 
                 Rx+= result
         
         if self.pad=='SAME':
-            return Rx[:, (pc/2):in_w+(pc/2), (pr/2):in_h+(pr/2), :]
+            return Rx[:, (pc/2):in_cols+(pc/2), (pr/2):in_rows+(pr/2), :]
         elif self.pad =='VALID':
             return Rx
         

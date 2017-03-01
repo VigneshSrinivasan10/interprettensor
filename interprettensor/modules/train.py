@@ -55,18 +55,18 @@ class Train():
         # Available loss operations are - [adam, adagrad, adadelta, grad_descent, rmsprop]
         with tf.name_scope('train'):
             if self.optimizer == 'adam':
-                self.train = tf.train.AdamOptimizer(self.learning_rate).minimize(self.cost, var_list=self.var_list)
+                self.train = tf.train.AdamOptimizer(self.learning_rate).minimize(self.cost)
 
             elif self.optimizer == 'rmsprop':
-                self.train = tf.train.AdamOptimizer(self.learning_rate).minimize(self.cost, var_list=self.var_list)
+                self.train = tf.train.AdamOptimizer(self.learning_rate).minimize(self.cost)
 
             elif self.optimizer == 'grad_descent':
-                self.train = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(self.cost, var_list=self.var_list)
+                self.train = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(self.cost)
             elif self.optimizer == 'adagrad':
-                self.train = tf.train.AdagradOptimizer(self.learning_rate).minimize(self.cost, var_list=self.var_list)
+                self.train = tf.train.AdagradOptimizer(self.learning_rate).minimize(self.cost)
 
             elif self.optimizer == 'adadelta':
-                self.train = tf.train.AdadeltaOptimizer(self.learning_rate).minimize(self.cost, var_list=self.var_list)
+                self.train = tf.train.AdadeltaOptimizer(self.learning_rate).minimize(self.cost)
             else:
                 print 'Optimizer should be one of: [adam, adagrad, adadelta, grad_descent, rmsprop]'
 

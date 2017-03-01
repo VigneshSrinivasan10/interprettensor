@@ -153,6 +153,8 @@ class Sequential(Module):
 
         for m in self.modules[::-1]:
             print m.name+'::',
+            print R.get_shape().as_list()
+            
             R = m.lrp(R,lrp_var,param)
         print '\n'+'------------------------------------------------- '
 

@@ -14,20 +14,21 @@
 import tensorflow as tf
 from module import Module
 import variables
-
+import activations
 
 class Linear(Module):
     '''
     Linear Layer
     '''
 
-    def __init__(self, output_dim, batch_size=None, input_dim = None, keep_prob=1.0, name="linear"):
+    def __init__(self, output_dim, batch_size=None, input_dim = None, act = 'linear', keep_prob=1.0, name="linear"):
         self.name = name
         Module.__init__(self)
 
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.batch_size = batch_size
+        self.act = act
         self.keep_prob = keep_prob
         
         
@@ -50,7 +51,12 @@ class Linear(Module):
 
         #import pdb;pdb.set_trace()
         with tf.name_scope(self.name):
-            self.activations = tf.nn.bias_add(tf.matmul(self.input_tensor, self.weights), self.biases, name=self.name)
+            linear = tf.nn.bias_add(tf.matmul(self.input_tensor, self.weights), self.biases, name=self.name)
+            if isinstance(self.act, str): 
+                self.activations = activations.apply(linear, self.act)
+            elif hasattr(self.act, '__call__'):
+                self.activations = self.act(conv)
+
             if self.keep_prob<1.0:
                 self.activations = tf.nn.dropout(self.activations, keep_prob=self.keep_prob)
             #activations = activation_fn(conv, name='activation')
@@ -77,6 +83,9 @@ class Linear(Module):
 
         Z = tf.expand_dims(self.weights, 0) * tf.expand_dims(self.input_tensor, -1)
         Zs = tf.expand_dims(tf.reduce_sum(Z, 1), 1) + tf.expand_dims(tf.expand_dims(self.biases, 0), 0)
+        stabilizer = 1e-8*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+        Zs += stabilizer
+                
         return tf.reduce_sum((Z / Zs) * tf.expand_dims(self.R, 1),2)
 
     

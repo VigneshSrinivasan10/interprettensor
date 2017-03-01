@@ -37,11 +37,11 @@ logging = tf.logging
 
 
 
-flags.DEFINE_integer("batch_size", 100,'Number of steps to run trainer.')
+flags.DEFINE_integer("batch_size", 200,'Number of steps to run trainer.')
 flags.DEFINE_string("data_dir", 'data','Directory for storing data')
 flags.DEFINE_string("summaries_dir", 'my_model_logs','Summaries directory')
 flags.DEFINE_boolean("relevance_bool", True,'Compute relevances')
-flags.DEFINE_string("checkpoint_dir", 'mnist_liner_model','Checkpoint dir')
+flags.DEFINE_string("checkpoint_dir", '/home/srinivasan/Projects/interprettensor/interprettensor/examples/mnist_linear_model','Checkpoint dir')
 
 
 FLAGS = flags.FLAGS
@@ -63,15 +63,19 @@ def visualize(relevances, images_tensor):
 
 def init_vars(sess):
     saver = tf.train.Saver()
-    tf.initialize_all_variables().run()
+    tf.global_variables_initializer().run()
+    #tf.initialize_all_variables().run()
+    #pdb.set_trace()
     ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
-    pdb.set_trace()
     try: 
         if ckpt and ckpt.model_checkpoint_path:
             print('Reloading from -- '+FLAGS.checkpoint_dir+'/model.ckpt')
             saver.restore(sess, ckpt.model_checkpoint_path)
         else:
-            raise ValueError('No model found!')
+            tvars = np.load('/home/srinivasan/Projects/interprettensor/interprettensor/examples/mnist_linear_model/model.npy')
+            for ii in range(8): sess.run(tf.trainable_variables()[ii].assign(tvars[ii]))
+            pdb.set_trace()
+            print('No model found!')
     except:
         raise ValueError('Layer definition and model layers mismatch!')
     return saver
@@ -82,21 +86,24 @@ def plot_relevances(rel, img, writer):
     writer.flush()
     
 def layers(x):
-    # Define the layers of your network here 
-    my_network = Sequential([Linear(784,500, input_shape=(FLAGS.batch_size,784)), 
-                             Relu(),
-                             Linear(500, 100), 
-                             Relu(),
-                             Linear(100, 10),
-                             Softmax()])
-    return my_network
+    # Define the layers of your network here
+    
+    return Sequential([Linear(input_dim=784,output_dim=1296, batch_size=FLAGS.batch_size),
+                     Relu(),
+                     Linear(1296), 
+                     Relu(),
+                     Linear(1296),
+                     Relu(),
+                     Linear(10),
+                     Softmax()])
+
 
 def test():
 
     mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True)
 
     with tf.Session() as sess:
-        x = tf.placeholder(tf.float32, [None, 784], name='input')
+        x = tf.placeholder(tf.float32, [FLAGS.batch_size, 784], name='input')
         with tf.variable_scope('model'):
             my_netowrk = layers(x)
             output = my_netowrk.forward(x)
@@ -109,11 +116,11 @@ def test():
 
         # Intialize variables and reload your model
         saver = init_vars(sess)
-
+        
         # Extract testing data 
         xs, ys = mnist.test.next_batch(FLAGS.batch_size)
         # Pass the test data to the restored model
-        summary, relevance_test= sess.run([merged, RELEVANCE], feed_dict={x:xs})
+        summary, relevance_test= sess.run([merged, RELEVANCE], feed_dict={x:(2*xs)-1})
         test_writer.add_summary(summary, 0)
 
         # Save the images as heatmaps to visualize on tensorboard

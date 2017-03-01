@@ -56,48 +56,19 @@ flags.DEFINE_string("checkpoint_reload_dir", 'mnist_trained_model','Checkpoint d
 FLAGS = flags.FLAGS
 
 
-def nn_():
-    
-    return Sequential([Convolution(output_depth=32,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28),
-                    Tanh(),
-                    #MaxPool(),
-                    Convolution(64),
-                    Tanh(),  
-                    # Convolution(64),
-                    # Tanh(),  
-                    #MaxPool(),
-                    Linear(10), 
-                    Softmax()])
 def nn():
     
-    return Sequential([Convolution(output_depth=10,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28, stride_size=1, pad='VALID'),
-                       Relu(),
+    return Sequential([Convolution(output_depth=10,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28, act ='relu', stride_size=1, pad='VALID'),
                        AvgPool(),
 
-                       Convolution(output_depth=25,stride_size=1, pad='VALID'),
-                       Relu(),
+                       Convolution(output_depth=25,stride_size=1, act ='relu', pad='VALID'),
                        AvgPool(),
                        
-                       Convolution(kernel_size=4,output_depth=100,stride_size=1, pad='VALID'),
-                       Relu(),
+                       Convolution(kernel_size=4,output_depth=100,stride_size=1, act ='relu', pad='VALID'),
                        AvgPool(),
                        
                        Convolution(kernel_size=1, output_depth=10,stride_size=1, pad='VALID'),
                        Softmax()])
-
-
-def nn__():    
-    return Sequential([Convolution(output_depth=10,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28),
-                    Tanh(),
-                    MaxPool(),
-                    Convolution(64),
-                    Tanh(),  
-                    # Convolution(64),
-                    # Tanh(),  
-                    MaxPool(),
-                    Linear(10), 
-                    Softmax()])
-
 
 
 def feed_dict(mnist, train):
@@ -159,9 +130,9 @@ def train():
     tf.global_variables_initializer().run()
     
     utils = Utils(sess, FLAGS.checkpoint_reload_dir)
-    #tvars = np.load(FLAGS.checkpoint_reload_dir)
+    # tvars = np.load(FLAGS.checkpoint_reload_dir+'/model.npy')
+    # for ii in range(8): sess.run(tf.trainable_variables()[ii].assign(tvars[ii]))
     if FLAGS.reload_model:
-        #for ii in range(8): sess.run(tf.trainable_variables()[ii].assign(tvars[ii]))
         utils.reload_model()
 
     for i in range(FLAGS.max_steps):
@@ -192,15 +163,15 @@ def train():
     if FLAGS.relevance_bool:
         #pdb.set_trace()
         relevance_test = relevance_test[:,2:30,2:30,:]
-        relevance_train = relevance_train[:,2:30,2:30,:]
         # plot test images with relevances overlaid
         images = test_inp[test_inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
         #images = (images + 1)/2.0
         plot_relevances(relevance_test.reshape([FLAGS.batch_size,28,28,1]), images, test_writer )
+
         # plot train images with relevances overlaid
-        images = inp[inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
-        #images = (images + 1)/2.0
-        plot_relevances(relevance_train.reshape([FLAGS.batch_size,28,28,1]), images, train_writer )
+        # relevance_train = relevance_train[:,2:30,2:30,:]
+        # images = inp[inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
+        # plot_relevances(relevance_train.reshape([FLAGS.batch_size,28,28,1]), images, train_writer )
 
 
     train_writer.close()
