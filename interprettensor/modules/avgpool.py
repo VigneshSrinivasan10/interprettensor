@@ -15,6 +15,15 @@ import tensorflow as tf
 from module import Module
 
 
+
+from math import ceil
+
+from tensorflow.python.framework import ops
+from tensorflow.python.framework import sparse_tensor
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import sparse_ops
+
+
 class AvgPool(Module):
 
     def __init__(self, pool_size=(2,2), pool_stride=None, pad = 'SAME',name='avgpool'):
