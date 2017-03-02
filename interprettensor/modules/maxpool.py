@@ -15,6 +15,14 @@ import tensorflow as tf
 from module import Module
 
 
+from math import ceil
+
+from tensorflow.python.framework import ops
+from tensorflow.python.framework import sparse_tensor
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import sparse_ops
+
+
 class MaxPool(Module):
 
     def __init__(self, pool_size=(2,2), pool_stride=None, pad = 'SAME',name='maxpool'):
@@ -42,6 +50,41 @@ class MaxPool(Module):
         '''
         LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
         '''
+        import time; start_time = time.time()
+        
+        self.R = R
+        R_shape = self.R.get_shape().as_list()
+        activations_shape = self.activations.get_shape().as_list()
+        if len(R_shape)!=4:
+            self.R = tf.reshape(self.R, activations_shape)
+
+        N,Hout,Wout,NF = self.R.get_shape().as_list()
+        _, hf,wf,_ = self.pool_size
+        _, hstride, wstride, _ = self.pool_stride
+        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+
+        op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding=self.pad)
+        p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
+        image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
+        #import pdb; pdb.set_trace()
+        Z = tf.equal( tf.reshape(self.activations, [N,Hout,Wout,1,1,NF]), image_patches)
+        Z = tf.where(Z, tf.ones_like(Z, dtype=tf.float32), tf.zeros_like(Z,dtype=tf.float32) )
+        #Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
+        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+        Zs += stabilizer
+        result =   (Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,NF])
+        Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
+        
+        total_time = time.time() - start_time
+        print(total_time)
+        return Rx
+
+    def __simple_lrp(self,R):
+        '''
+        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
+        '''
+        import time; start_time = time.time()
             
         self.R = R
         R_shape = self.R.get_shape().as_list()
@@ -85,6 +128,8 @@ class MaxPool(Module):
                 result = tf.pad(result, [[0,0],[pad_left, pad_right],[pad_up, pad_bottom],[0,0]], "CONSTANT")
                 
                 Rx+= result
+        total_time = time.time() - start_time
+        print(total_time)
         
         if self.pad=='SAME':
             return Rx[:, (pc/2):in_cols+(pc/2), (pr/2):in_rows+(pr/2), :]
@@ -155,3 +200,69 @@ class MaxPool(Module):
         Since there is only one (or several equally strong) dominant activations, default to _simple_lrp
         '''
         return self._simple_lrp(R)
+
+    def patches_to_images(self, grad, batch_size, rows_in, cols_in, channels, rows_out, cols_out, ksize_r, ksize_c, stride_h, stride_r ):
+        rate_r = 1
+        rate_c = 1
+        padding = self.pad
+        
+        
+        ksize_r_eff = ksize_r + (ksize_r - 1) * (rate_r - 1)
+        ksize_c_eff = ksize_c + (ksize_c - 1) * (rate_c - 1)
+
+        if padding == 'SAME':
+            rows_out = int(ceil(rows_in / stride_r))
+            cols_out = int(ceil(cols_in / stride_h))
+            pad_rows = ((rows_out - 1) * stride_r + ksize_r_eff - rows_in) // 2
+            pad_cols = ((cols_out - 1) * stride_h + ksize_c_eff - cols_in) // 2
+
+        elif padding == 'VALID':
+            rows_out = int(ceil((rows_in - ksize_r_eff + 1) / stride_r))
+            cols_out = int(ceil((cols_in - ksize_c_eff + 1) / stride_h))
+            pad_rows = (rows_out - 1) * stride_r + ksize_r_eff - rows_in
+            pad_cols = (cols_out - 1) * stride_h + ksize_c_eff - cols_in
+
+        pad_rows, pad_cols = max(0, pad_rows), max(0, pad_cols)
+
+        grad_expanded = array_ops.transpose(
+            array_ops.reshape(grad, (batch_size, rows_out,
+                                     cols_out, ksize_r, ksize_c, channels)),
+            (1, 2, 3, 4, 0, 5)
+        )
+        grad_flat = array_ops.reshape(grad_expanded, (-1, batch_size * channels))
+
+        row_steps = range(0, rows_out * stride_r, stride_r)
+        col_steps = range(0, cols_out * stride_h, stride_h)
+
+        idx = []
+        for i in range(rows_out):
+            for j in range(cols_out):
+                r_low, c_low = row_steps[i] - pad_rows, col_steps[j] - pad_cols
+                r_high, c_high = r_low + ksize_r_eff, c_low + ksize_c_eff
+
+                idx.extend([(r * (cols_in) + c,
+                   i * (cols_out * ksize_r * ksize_c) +
+                   j * (ksize_r * ksize_c) +
+                   ri * (ksize_c) + ci)
+                  for (ri, r) in enumerate(range(r_low, r_high, rate_r))
+                  for (ci, c) in enumerate(range(c_low, c_high, rate_c))
+                  if 0 <= r and r < rows_in and 0 <= c and c < cols_in
+                ])
+
+        sp_shape = (rows_in * cols_in,
+              rows_out * cols_out * ksize_r * ksize_c)
+
+        sp_mat = sparse_tensor.SparseTensor(
+            array_ops.constant(idx, dtype=ops.dtypes.int64),
+            array_ops.ones((len(idx),), dtype=ops.dtypes.float32),
+            sp_shape
+        )
+
+        jac = sparse_ops.sparse_tensor_dense_matmul(sp_mat, grad_flat)
+
+        grad_out = array_ops.reshape(
+            jac, (rows_in, cols_in, batch_size, channels)
+        )
+        grad_out = array_ops.transpose(grad_out, (2, 0, 1, 3))
+        
+        return grad_out
