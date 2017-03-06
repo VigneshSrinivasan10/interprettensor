@@ -124,7 +124,7 @@ class Convolution(Module):
         #result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
         total_time = time.time() - start_time
         print(total_time)
-        return self.patches_to_images(tf.reshape(tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6), [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
+        return self.patches_to_images(tf.reshape(tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6), [N,Hout,Wout, hf*wf*in_depth]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
         
         # return Rx
 
