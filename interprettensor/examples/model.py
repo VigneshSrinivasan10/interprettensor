@@ -88,12 +88,9 @@ def plot_relevances(rel, img, writer):
 def layers(x):
     # Define the layers of your network here
     
-    return Sequential([Linear(input_dim=784,output_dim=1296, batch_size=FLAGS.batch_size),
-                     Relu(),
-                     Linear(1296), 
-                     Relu(),
-                     Linear(1296),
-                     Relu(),
+    return Sequential([Linear(input_dim=784,output_dim=1296, act='relu', batch_size=FLAGS.batch_size),                     
+                     Linear(1296, act='relu'), 
+                     Linear(1296, act='relu'),
                      Linear(10),
                      Softmax()])
 

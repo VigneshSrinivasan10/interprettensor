@@ -113,20 +113,20 @@ class Convolution(Module):
         _, hstride, wstride, _ = self.strides
         in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
 
-        op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding=self.pad)
-        p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
-        image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
+        # op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding=self.pad)
+        # p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
+        image_patches = tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding=self.pad), [N,Hout,Wout, hf, wf, in_depth])
         #pdb.set_trace()
-        Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
-        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        #Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
+        Zs = tf.reduce_sum(tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1), [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
         stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
         Zs += stabilizer
-        result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
-        Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
-        
+        #result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
         total_time = time.time() - start_time
         print(total_time)
-        return Rx
+        return self.patches_to_images(tf.reshape(tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6), [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
+        
+        # return Rx
 
     def _epsilon_lrp(self,R, epsilon):
         '''
