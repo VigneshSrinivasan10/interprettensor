@@ -117,8 +117,8 @@ class Convolution(Module):
         # p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
         image_patches = tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding=self.pad), [N,Hout,Wout, hf, wf, in_depth])
         #pdb.set_trace()
-        #Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
-        Zs = tf.reduce_sum(tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1), [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
+        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
         stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
         Zs += stabilizer
         #result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
