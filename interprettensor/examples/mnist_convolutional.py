@@ -85,8 +85,11 @@ def feed_dict(mnist, train):
 def train():
   # Import data
   mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True)
+  config = tf.ConfigProto(allow_soft_placement = True)
+  config.gpu_options.allow_growth = True
+  with tf.Session(config=config) as sess:
 
-  with tf.Session() as sess:
+    #with tf.Session() as sess:
     # Input placeholders
     with tf.name_scope('input'):
         x = tf.placeholder(tf.float32, [None, 784], name='x-input')
@@ -109,10 +112,10 @@ def train():
             #RELEVANCE = net.lrp(op, 'alphabeta', 0.7)
 
             relevance_layerwise = []
-            # R = y
-            # for layer in net.modules[::-1]:
-            #     R = net.lrp_layerwise(layer, R, 'simple')
-            #     relevance_layerwise.append(R)
+            R = y
+            for layer in net.modules[::-1]:
+                R = net.lrp_layerwise(layer, R, 'simple')
+                relevance_layerwise.append(R)
 
         else:
             RELEVANCE=[]
@@ -139,6 +142,7 @@ def train():
         if i % FLAGS.test_every == 0:  # test-set accuracy
             d = feed_dict(mnist, False)
             test_inp = {x:d[0], y_: d[1], keep_prob: d[2]}
+            pdb.set_trace()
             summary, acc , relevance_test, rel_layer= sess.run([merged, accuracy, RELEVANCE, relevance_layerwise], feed_dict=test_inp)
             test_writer.add_summary(summary, i)
             print('Accuracy at step %s: %f' % (i, acc))

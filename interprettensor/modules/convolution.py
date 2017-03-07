@@ -62,10 +62,10 @@ class Convolution(Module):
         self.input_tensor = input_tensor
         #pdb.set_trace()
         self.check_input_shape()
-        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+        self.in_N, self.in_h, self.in_w, self.in_depth = self.input_tensor.get_shape().as_list()
         
         # init weights
-        self.weights_shape = [self.kernel_size, self.kernel_size, in_depth, self.output_depth]
+        self.weights_shape = [self.kernel_size, self.kernel_size, self.in_depth, self.output_depth]
         self.strides = [1,self.stride_size, self.stride_size,1]
         with tf.variable_scope(self.name):
             self.weights = variables.weights(self.weights_shape)
@@ -95,7 +95,20 @@ class Convolution(Module):
         pad_right = pad_in_w - (j*wstride+wf) if ( pad_in_w - (j*wstride+wf) > 0) else 0
         pad_left = j*wstride
         return [[pad_top, pad_bottom], [pad_left, pad_right]]
+
+    def extract_patches(self):
+        self.image_patches = tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, self.kernel_size,self.kernel_size, 1], strides=[1, self.stride_size,self.stride_size, 1], rates=[1, 1, 1, 1], padding=self.pad), [self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth])
+
+    def compute_z(self):
+        return tf.expand_dims(self.weights, 0) * tf.expand_dims(tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, self.kernel_size,self.kernel_size, 1], strides=[1, self.stride_size,self.stride_size, 1], rates=[1, 1, 1, 1], padding=self.pad), [self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth]), -1)
     
+    def compute_zs(self, stabilizer=True, epsilon=1e-12):
+        Zs = tf.reduce_sum(self.Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        if stabilizer==True:
+            stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+            Zs += stabilizer
+        return Zs
+        
     def _simple_lrp(self,R):
         '''
         LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
@@ -108,23 +121,23 @@ class Convolution(Module):
         if len(R_shape)!=4:
             self.R = tf.reshape(self.R, activations_shape)
 
-        N,Hout,Wout,NF = self.R.get_shape().as_list()
-        hf,wf,df,NF = self.weights_shape
-        _, hstride, wstride, _ = self.strides
-        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
+        N,self.Hout,self.Wout,NF = self.R.get_shape().as_list()
 
-        # op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding=self.pad)
-        # p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
-        image_patches = tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding=self.pad), [N,Hout,Wout, hf, wf, in_depth])
+
         #pdb.set_trace()
-        Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
-        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
-        stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
-        Zs += stabilizer
+        self.Z = self.compute_z()
+        self.Zs = self.compute_zs()
+
+        # image_patches = tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, self.kernel_size,self.kernel_size, 1], strides=[1, self.stride_size,self.stride_size, 1], rates=[1, 1, 1, 1], padding=self.pad), [self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth])
+        # Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
+        # Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        # stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+        # Zs += stabilizer
         #result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
+        result = tf.reshape(tf.reduce_sum((self.Z/self.Zs) * tf.reshape(self.R, [self.in_N,self.Hout,self.Wout,1,1,1,self.output_depth]), 6), [self.in_N,self.Hout,self.Wout, self.kernel_size*self.kernel_size*self.in_depth])
         total_time = time.time() - start_time
         print(total_time)
-        return self.patches_to_images(tf.reshape(tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6), [N,Hout,Wout, hf*wf*in_depth]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
+        return self.patches_to_images(result, self.in_N, self.in_h, self.in_w, self.in_depth, self.Hout, self.Wout, self.kernel_size, self.kernel_size, self.stride_size,self.stride_size )
         
         # return Rx
 
