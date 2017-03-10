@@ -89,6 +89,186 @@ class Convolution(Module):
 
         return self.activations
 
+    def _simple_lrp(self,R):
+        '''
+        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
+        '''
+        
+        self.check_shape(R)
+
+        image_patches = self.extract_patches()
+        Z = self.compute_z(image_patches)
+        Zs = self.compute_zs(Z)
+        result = self.compute_result(Z,Zs)
+        return self.restitch_image(result)
+        
+    def _epsilon_lrp(self,R, epsilon):
+        '''
+        LRP according to Eq(58) in DOI: 10.1371/journal.pone.0130140
+        '''
+        self.check_shape(R)
+
+        image_patches = self.extract_patches()
+        Z = self.compute_z(image_patches)
+        Zs = self.compute_zs(Z, epsilon=epsilon)
+        result = self.compute_result(Z,Zs)
+        return self.restitch_image(result)
+
+    def _ww_lrp(self,R): 
+        '''
+        LRP according to Eq(12) in https://arxiv.org/pdf/1512.02479v1.pdf
+        '''
+        self.check_shape(R)
+
+        image_patches = tf.ones([self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth])
+        #pdb.set_trace()
+        ww = tf.square(self.weights)
+        self.Z = tf.expand_dims(ww,0)
+        #self.Z = tf.expand_dims(tf.tile(tf.reshape(ww, [1,1,self.kernel_size, self.kernel_size, self.in_depth, self.output_depth]), [self.Hout, self.Wout, 1,1,1,1]), 0)
+        #self.Z = tf.expand_dims(tf.square(self.weights), 0) * tf.expand_dims(image_patches, -1)
+        #self.Zs = tf.reduce_sum(self.Z, [3,4,5], keep_dims=True)
+        self.Zs = tf.reduce_sum(self.Z, [1,2,3], keep_dims=True)
+        return self.compute_result()
+
+    def _flat_lrp(self,R):
+        '''
+        distribute relevance for each output evenly to the output neurons' receptive fields.
+        '''
+        self.check_shape(R)
+
+        Z = tf.ones([self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth, self.output_depth])
+        Zs = self.compute_zs(Z)
+        result = self.compute_result(Z,Zs)
+        return self.restitch_image(result)
+
+
+    def _alphabeta_lrp(self,R,alpha):
+        '''
+        LRP according to Eq(60) in DOI: 10.1371/journal.pone.0130140
+        '''
+        beta = 1 - alpha
+        self.check_shape(R)
+
+        image_patches = self.extract_patches()
+        Z = self.compute_z(image_patches)
+        if not alpha == 0:
+            Zp = tf.where(tf.greater(Z,0),Z, tf.zeros_like(Z))
+            Zsp = self.compute_zs(Zp)
+            Ralpha = alpha * self.compute_result(Zp,Zsp)
+        else:
+            Ralpha = 0
+        if not beta == 0:
+            Zn = tf.where(tf.less(Z,0),Z, tf.zeros_like(Z))
+            Zsn = self.compute_zs(Zn)
+            Rbeta = beta * self.compute_result(Zn,Zsn)
+        else:
+            Rbeta = 0
+
+        result = Ralpha + Rbeta
+        return self.restitch_image(result)
+    
+
+    def check_shape(self, R):
+        self.R = R
+        R_shape = self.R.get_shape().as_list()
+        activations_shape = self.activations.get_shape().as_list()
+        if len(R_shape)!=4:
+            self.R = tf.reshape(self.R, activations_shape)
+        N,self.Hout,self.Wout,NF = self.R.get_shape().as_list()
+
+    def extract_patches(self):
+        image_patches = tf.extract_image_patches(self.input_tensor, ksizes=[1, self.kernel_size,self.kernel_size, 1], strides=[1, self.stride_size,self.stride_size, 1], rates=[1, 1, 1, 1], padding=self.pad)
+        return tf.reshape(image_patches, [self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth])
+        
+    def compute_z(self, image_patches):
+        return tf.multiply(tf.expand_dims(self.weights, 0), tf.expand_dims(image_patches, -1))
+        
+    def compute_zs(self, Z, stabilizer=True, epsilon=1e-12):
+        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        if stabilizer==True:
+            stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
+            Zs += stabilizer
+        return Zs
+
+    def compute_result(self, Z, Zs):
+        result = tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [self.in_N,self.Hout,self.Wout,1,1,1,self.output_depth]), 6)
+        return tf.reshape(result, [self.in_N,self.Hout,self.Wout, self.kernel_size*self.kernel_size*self.in_depth])
+
+    def restitch_image(self, result):
+        return self.patches_to_images(result, self.in_N, self.in_h, self.in_w, self.in_depth, self.Hout, self.Wout, self.kernel_size, self.kernel_size, self.stride_size,self.stride_size )
+
+    def clean(self):
+        self.activations = None
+        self.R = None
+
+    def patches_to_images(self, grad, batch_size, rows_in, cols_in, channels, rows_out, cols_out, ksize_r, ksize_c, stride_h, stride_r ):
+        rate_r = 1
+        rate_c = 1
+        padding = self.pad
+        
+        
+        ksize_r_eff = ksize_r + (ksize_r - 1) * (rate_r - 1)
+        ksize_c_eff = ksize_c + (ksize_c - 1) * (rate_c - 1)
+
+        if padding == 'SAME':
+            rows_out = int(ceil(rows_in / stride_r))
+            cols_out = int(ceil(cols_in / stride_h))
+            pad_rows = ((rows_out - 1) * stride_r + ksize_r_eff - rows_in) // 2
+            pad_cols = ((cols_out - 1) * stride_h + ksize_c_eff - cols_in) // 2
+
+        elif padding == 'VALID':
+            rows_out = int(ceil((rows_in - ksize_r_eff + 1) / stride_r))
+            cols_out = int(ceil((cols_in - ksize_c_eff + 1) / stride_h))
+            pad_rows = (rows_out - 1) * stride_r + ksize_r_eff - rows_in
+            pad_cols = (cols_out - 1) * stride_h + ksize_c_eff - cols_in
+
+        pad_rows, pad_cols = max(0, pad_rows), max(0, pad_cols)
+
+        grad_expanded = array_ops.transpose(
+            array_ops.reshape(grad, (batch_size, rows_out,
+                                     cols_out, ksize_r, ksize_c, channels)),
+            (1, 2, 3, 4, 0, 5)
+        )
+        grad_flat = array_ops.reshape(grad_expanded, (-1, batch_size * channels))
+
+        row_steps = range(0, rows_out * stride_r, stride_r)
+        col_steps = range(0, cols_out * stride_h, stride_h)
+
+        idx = []
+        for i in range(rows_out):
+            for j in range(cols_out):
+                r_low, c_low = row_steps[i] - pad_rows, col_steps[j] - pad_cols
+                r_high, c_high = r_low + ksize_r_eff, c_low + ksize_c_eff
+
+                idx.extend([(r * (cols_in) + c,
+                   i * (cols_out * ksize_r * ksize_c) +
+                   j * (ksize_r * ksize_c) +
+                   ri * (ksize_c) + ci)
+                  for (ri, r) in enumerate(range(r_low, r_high, rate_r))
+                  for (ci, c) in enumerate(range(c_low, c_high, rate_c))
+                  if 0 <= r and r < rows_in and 0 <= c and c < cols_in
+                ])
+
+        sp_shape = (rows_in * cols_in,
+              rows_out * cols_out * ksize_r * ksize_c)
+
+        sp_mat = sparse_tensor.SparseTensor(
+            array_ops.constant(idx, dtype=ops.dtypes.int64),
+            array_ops.ones((len(idx),), dtype=ops.dtypes.float32),
+            sp_shape
+        )
+
+        jac = sparse_ops.sparse_tensor_dense_matmul(sp_mat, grad_flat)
+
+        grad_out = array_ops.reshape(
+            jac, (rows_in, cols_in, batch_size, channels)
+        )
+        grad_out = array_ops.transpose(grad_out, (2, 0, 1, 3))
+        
+        return grad_out
+
+
+    # OLD METHODS BELOW    
     def padding(self, i,j, pad_in_h, pad_in_w, hstride, wstride, hf, wf):
         pad_bottom = pad_in_h - (i*hstride+hf) if( pad_in_h - (i*hstride+hf))>0 else 0
         pad_top = i*hstride
@@ -96,152 +276,7 @@ class Convolution(Module):
         pad_left = j*wstride
         return [[pad_top, pad_bottom], [pad_left, pad_right]]
 
-    def extract_patches(self):
-        self.image_patches = tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, self.kernel_size,self.kernel_size, 1], strides=[1, self.stride_size,self.stride_size, 1], rates=[1, 1, 1, 1], padding=self.pad), [self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth])
-
-    def compute_z(self):
-        return tf.expand_dims(self.weights, 0) * tf.expand_dims(tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, self.kernel_size,self.kernel_size, 1], strides=[1, self.stride_size,self.stride_size, 1], rates=[1, 1, 1, 1], padding=self.pad), [self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth]), -1)
     
-    def compute_zs(self, stabilizer=True, epsilon=1e-12):
-        Zs = tf.reduce_sum(self.Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
-        if stabilizer==True:
-            stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
-            Zs += stabilizer
-        return Zs
-        
-    def _simple_lrp(self,R):
-        '''
-        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
-        '''
-        import time; start_time = time.time()
-        
-        self.R = R
-        R_shape = self.R.get_shape().as_list()
-        activations_shape = self.activations.get_shape().as_list()
-        if len(R_shape)!=4:
-            self.R = tf.reshape(self.R, activations_shape)
-
-        N,self.Hout,self.Wout,NF = self.R.get_shape().as_list()
-
-
-        #pdb.set_trace()
-        self.Z = self.compute_z()
-        self.Zs = self.compute_zs()
-
-        # image_patches = tf.reshape(tf.extract_image_patches(self.input_tensor, ksizes=[1, self.kernel_size,self.kernel_size, 1], strides=[1, self.stride_size,self.stride_size, 1], rates=[1, 1, 1, 1], padding=self.pad), [self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth])
-        # Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
-        # Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
-        # stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
-        # Zs += stabilizer
-        #result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
-        result = tf.reshape(tf.reduce_sum((self.Z/self.Zs) * tf.reshape(self.R, [self.in_N,self.Hout,self.Wout,1,1,1,self.output_depth]), 6), [self.in_N,self.Hout,self.Wout, self.kernel_size*self.kernel_size*self.in_depth])
-        total_time = time.time() - start_time
-        print(total_time)
-        return self.patches_to_images(result, self.in_N, self.in_h, self.in_w, self.in_depth, self.Hout, self.Wout, self.kernel_size, self.kernel_size, self.stride_size,self.stride_size )
-        
-        # return Rx
-
-    def _epsilon_lrp(self,R, epsilon):
-        '''
-        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
-        '''
-        import time; start_time = time.time()
-        
-        self.R = R
-        R_shape = self.R.get_shape().as_list()
-        activations_shape = self.activations.get_shape().as_list()
-        if len(R_shape)!=4:
-            self.R = tf.reshape(self.R, activations_shape)
-
-        N,Hout,Wout,NF = self.R.get_shape().as_list()
-        hf,wf,df,NF = self.weights_shape
-        _, hstride, wstride, _ = self.strides
-        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
-
-        op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding='VALID')
-        p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
-        image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
-        
-        Z = tf.expand_dims(self.weights, 0) * tf.expand_dims( image_patches, -1)
-        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
-        stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
-        Zs += stabilizer
-        result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
-        Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
-        
-        total_time = time.time() - start_time
-        print(total_time)
-        return Rx
-
-    def _ww_lrp(self,R):
-        '''
-        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
-        '''
-        import time; start_time = time.time()
-        
-        self.R = R
-        R_shape = self.R.get_shape().as_list()
-        activations_shape = self.activations.get_shape().as_list()
-        if len(R_shape)!=4:
-            self.R = tf.reshape(self.R, activations_shape)
-
-        N,Hout,Wout,NF = self.R.get_shape().as_list()
-        hf,wf,df,NF = self.weights_shape
-        _, hstride, wstride, _ = self.strides
-        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
-
-        op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding='VALID')
-        p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
-        #image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
-        image_patches = tf.ones([p_bs,p_h,p_w, hf, wf, in_depth])
-        
-        
-        Z = tf.square(tf.expand_dims(self.weights, 0)) * tf.expand_dims( image_patches, -1)
-        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
-        stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
-        Zs += stabilizer
-        result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
-        Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
-        
-        total_time = time.time() - start_time
-        print(total_time)
-        return Rx
-
-    def _flat_lrp(self,R):
-        '''
-        LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
-        '''
-        import time; start_time = time.time()
-        
-        self.R = R
-        R_shape = self.R.get_shape().as_list()
-        activations_shape = self.activations.get_shape().as_list()
-        if len(R_shape)!=4:
-            self.R = tf.reshape(self.R, activations_shape)
-
-        N,Hout,Wout,NF = self.R.get_shape().as_list()
-        hf,wf,df,NF = self.weights_shape
-        _, hstride, wstride, _ = self.strides
-        in_N, in_h, in_w, in_depth = self.input_tensor.get_shape().as_list()
-
-        op1 = tf.extract_image_patches(self.input_tensor, ksizes=[1, hf,wf, 1], strides=[1, hstride, wstride, 1], rates=[1, 1, 1, 1], padding='VALID')
-        p_bs, p_h, p_w, p_c = op1.get_shape().as_list()
-        #image_patches = tf.reshape(op1, [p_bs,p_h,p_w, hf, wf, in_depth])
-        image_patches = tf.ones([p_bs,p_h,p_w, hf, wf, in_depth])
-        
-        
-        Z = tf.expand_dims( image_patches, -1)
-        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
-        stabilizer = 1e-12*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
-        Zs += stabilizer
-        result =   tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [in_N,Hout,Wout,1,1,1,NF]), 6)
-        Rx = self.patches_to_images(tf.reshape(result, [p_bs, p_h, p_w, p_c]), in_N, in_h, in_w, in_depth, Hout, Wout, hf,wf, hstride,wstride )
-        
-        total_time = time.time() - start_time
-        print(total_time)
-        return Rx
-    
-    # OLD METHODS BELOW
     def __simple_lrp(self,R):
         '''
         LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140
@@ -492,7 +527,7 @@ class Convolution(Module):
             return Rx
         
 
-    def _alphabeta_lrp(self,R, alpha):
+    def __alphabeta_lrp(self,R, alpha):
         '''
         LRP according to Eq(60) in DOI: 10.1371/journal.pone.0130140
         '''
@@ -565,69 +600,3 @@ class Convolution(Module):
         elif self.pad =='VALID':
             return Rx
         
-    #def patches_to_images(self, grad, in_N, in_h, in_w, in_depth, out_h, out_w, hf,wf, hstride,wstride ):
-    def patches_to_images(self, grad, batch_size, rows_in, cols_in, channels, rows_out, cols_out, ksize_r, ksize_c, stride_h, stride_r ):
-        rate_r = 1
-        rate_c = 1
-        padding = self.pad
-        
-        
-        ksize_r_eff = ksize_r + (ksize_r - 1) * (rate_r - 1)
-        ksize_c_eff = ksize_c + (ksize_c - 1) * (rate_c - 1)
-
-        if padding == 'SAME':
-            rows_out = int(ceil(rows_in / stride_r))
-            cols_out = int(ceil(cols_in / stride_h))
-            pad_rows = ((rows_out - 1) * stride_r + ksize_r_eff - rows_in) // 2
-            pad_cols = ((cols_out - 1) * stride_h + ksize_c_eff - cols_in) // 2
-
-        elif padding == 'VALID':
-            rows_out = int(ceil((rows_in - ksize_r_eff + 1) / stride_r))
-            cols_out = int(ceil((cols_in - ksize_c_eff + 1) / stride_h))
-            pad_rows = (rows_out - 1) * stride_r + ksize_r_eff - rows_in
-            pad_cols = (cols_out - 1) * stride_h + ksize_c_eff - cols_in
-
-        pad_rows, pad_cols = max(0, pad_rows), max(0, pad_cols)
-
-        grad_expanded = array_ops.transpose(
-            array_ops.reshape(grad, (batch_size, rows_out,
-                                     cols_out, ksize_r, ksize_c, channels)),
-            (1, 2, 3, 4, 0, 5)
-        )
-        grad_flat = array_ops.reshape(grad_expanded, (-1, batch_size * channels))
-
-        row_steps = range(0, rows_out * stride_r, stride_r)
-        col_steps = range(0, cols_out * stride_h, stride_h)
-
-        idx = []
-        for i in range(rows_out):
-            for j in range(cols_out):
-                r_low, c_low = row_steps[i] - pad_rows, col_steps[j] - pad_cols
-                r_high, c_high = r_low + ksize_r_eff, c_low + ksize_c_eff
-
-                idx.extend([(r * (cols_in) + c,
-                   i * (cols_out * ksize_r * ksize_c) +
-                   j * (ksize_r * ksize_c) +
-                   ri * (ksize_c) + ci)
-                  for (ri, r) in enumerate(range(r_low, r_high, rate_r))
-                  for (ci, c) in enumerate(range(c_low, c_high, rate_c))
-                  if 0 <= r and r < rows_in and 0 <= c and c < cols_in
-                ])
-
-        sp_shape = (rows_in * cols_in,
-              rows_out * cols_out * ksize_r * ksize_c)
-
-        sp_mat = sparse_tensor.SparseTensor(
-            array_ops.constant(idx, dtype=ops.dtypes.int64),
-            array_ops.ones((len(idx),), dtype=ops.dtypes.float32),
-            sp_shape
-        )
-
-        jac = sparse_ops.sparse_tensor_dense_matmul(sp_mat, grad_flat)
-
-        grad_out = array_ops.reshape(
-            jac, (rows_in, cols_in, batch_size, channels)
-        )
-        grad_out = array_ops.transpose(grad_out, (2, 0, 1, 3))
-        
-        return grad_out

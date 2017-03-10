@@ -162,6 +162,7 @@ class Sequential(Module):
 
     def lrp_layerwise(self, m, R,lrp_var=None,param=None):
         R = m.lrp(R,lrp_var,param)
+        m.clean()
         print m.name+'::',
         print R.get_shape().as_list()
         return R

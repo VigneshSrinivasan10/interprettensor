@@ -45,7 +45,8 @@ class MaxPool(Module):
 
     def clean(self):
         self.activations = None
-
+        self.R = None
+        
     def _simple_lrp(self,R):
         '''
         LRP according to Eq(56) in DOI: 10.1371/journal.pone.0130140

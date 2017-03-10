@@ -73,6 +73,10 @@ class Linear(Module):
 
     # def lrp(self, R):
     #     return self._simple_lrp(R)
+
+    def clean(self):
+        self.activations = None
+        self.R = None
         
     def _simple_lrp(self, R):
         self.R = R

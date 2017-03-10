@@ -105,17 +105,17 @@ def train():
         train = net.fit(output=y,ground_truth=y_,loss='softmax_crossentropy',optimizer='adam', opt_params=[FLAGS.learning_rate])
     with tf.variable_scope('relevance'):
         if FLAGS.relevance_bool:
-            RELEVANCE = net.lrp(op, FLAGS.relevance_method, 1.0)
+            #RELEVANCE = net.lrp(op, FLAGS.relevance_method, 1.0)
             #RELEVANCE = net.lrp(op, 'epsilon', 1e-3)
             #RELEVANCE = net.lrp(op, 'ww', 0)
             #RELEVANCE = net.lrp(op, 'flat', 0)
-            #RELEVANCE = net.lrp(op, 'alphabeta', 0.7)
+            RELEVANCE = net.lrp(op, 'alphabeta', 1)
 
             relevance_layerwise = []
-            R = y
-            for layer in net.modules[::-1]:
-                R = net.lrp_layerwise(layer, R, 'simple')
-                relevance_layerwise.append(R)
+            # R = y
+            # for layer in net.modules[::-1]:
+            #     R = net.lrp_layerwise(layer, R, 'simple')
+            #     relevance_layerwise.append(R)
 
         else:
             RELEVANCE=[]
@@ -142,7 +142,7 @@ def train():
         if i % FLAGS.test_every == 0:  # test-set accuracy
             d = feed_dict(mnist, False)
             test_inp = {x:d[0], y_: d[1], keep_prob: d[2]}
-            pdb.set_trace()
+            #pdb.set_trace()
             summary, acc , relevance_test, rel_layer= sess.run([merged, accuracy, RELEVANCE, relevance_layerwise], feed_dict=test_inp)
             test_writer.add_summary(summary, i)
             print('Accuracy at step %s: %f' % (i, acc))
@@ -171,7 +171,7 @@ def train():
         images = test_inp[test_inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
         #images = (images + 1)/2.0
         plot_relevances(relevance_test.reshape([FLAGS.batch_size,28,28,1]), images, test_writer )
-
+        
         # plot train images with relevances overlaid
         # relevance_train = relevance_train[:,2:30,2:30,:]
         # images = inp[inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
