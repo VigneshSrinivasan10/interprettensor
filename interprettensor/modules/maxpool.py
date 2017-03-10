@@ -38,6 +38,8 @@ class MaxPool(Module):
         
     def forward(self,input_tensor, batch_size=10, img_dim=28):
         self.input_tensor = input_tensor
+        self.in_N, self.in_h, self.in_w, self.in_depth = self.input_tensor.get_shape().as_list()
+        
         #with tf.variable_scope(self.name):
         with tf.name_scope(self.name):
             self.activations = tf.nn.max_pool(self.input_tensor, ksize=self.pool_kernel,strides=self.pool_stride,padding=self.pad, name=self.name )
