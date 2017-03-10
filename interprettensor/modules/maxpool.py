@@ -58,7 +58,7 @@ class MaxPool(Module):
         '''
         self.check_shape(R)
         image_patches = self.extract_patches()
-        Z = self.compute_z()
+        Z = self.compute_z(image_patches)
         Zs = self.compute_zs(Z)
         result = self.compute_result(Z,Zs)
         return self.restitch_image(result)
