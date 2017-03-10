@@ -1,4 +1,4 @@
-# Interpret Tensor - Slim wrapper for Tensorflow to compute Layer-wise Relevance Propagation 
+# Interpret Tensor - Slim TF wrapper to compute LRP
 
 The Layer-wise Relevance Propagation (LRP) algorithm explains a classifer's prediction specific to a given data point by attributing relevance scores to important components of the input by using the topology of the learned model itself.
 
@@ -60,20 +60,11 @@ Follow steps (1) from Features mentioned above.
 To run the given mnist examples,
    
         cd examples
-        python mnist_linear.py --relevance_bool=True
+        python mnist_linear.py --relevance=True
 
-It downloads and extract the mnist datset, runs it on a neural netowrk and plots the relevances once the network is optimized. The relvances of the images can be viewed using
+It downloads and extract the mnist datset, runs it on a neural netowrk and plots the relevances once the network is optimized. The relvances of the images can be viewed on the tensorboard using
    
         tensorboard --logdir=mnist_linear_logs
-
-<img src="doc/images/scalars.png" width="380" height="320">
-<img src="doc/images/images.png" width="380" height="320">
-
-<img src="doc/images/graph.png" width="380" height="320">
-<img src="doc/images/graph1.png" width="380" height="320">
-
-<img src="doc/images/hist.png" width="380" height="320">
-<img src="doc/images/distr.png" width="380" height="320">
 
 # LRP for a pretrained model
 

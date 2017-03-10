@@ -40,7 +40,7 @@ logging = tf.logging
 flags.DEFINE_integer("batch_size", 200,'Number of steps to run trainer.')
 flags.DEFINE_string("data_dir", 'data','Directory for storing data')
 flags.DEFINE_string("summaries_dir", 'my_model_logs','Summaries directory')
-flags.DEFINE_boolean("relevance_bool", True,'Compute relevances')
+flags.DEFINE_boolean("relevance", True,'Compute relevances')
 flags.DEFINE_string("checkpoint_dir", '/home/srinivasan/Projects/interprettensor/interprettensor/examples/mnist_linear_model','Checkpoint dir')
 
 
@@ -104,7 +104,7 @@ def test():
         with tf.variable_scope('model'):
             my_netowrk = layers(x)
             output = my_netowrk.forward(x)
-            if FLAGS.relevance_bool:
+            if FLAGS.relevance:
                 RELEVANCE = my_netowrk.lrp(output, 'simple', 1.0)
                 
         # Merge all the summaries and write them out 

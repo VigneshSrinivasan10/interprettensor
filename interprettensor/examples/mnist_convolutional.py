@@ -17,7 +17,6 @@ from __future__ import print_function
 
 import sys
 sys.path.append("..")
-sys.path.append('/home/srinivasan/Projects/lrp_toolbox/models/MNIST/')
 from modules.sequential import Sequential
 from modules.linear import Linear
 from modules.softmax import Softmax
@@ -44,8 +43,8 @@ flags.DEFINE_integer("test_every", 500,'Number of steps to run trainer.')
 flags.DEFINE_float("learning_rate", 0.01,'Initial learning rate')
 flags.DEFINE_float("dropout", 0.9, 'Keep probability for training dropout.')
 flags.DEFINE_string("data_dir", 'data','Directory for storing data')
-flags.DEFINE_string("summaries_dir", 'mnist_convolution_logs','Summaries directory')
-flags.DEFINE_boolean("relevance_bool", False,'Compute relevances')
+flags.DEFINE_string("summaries_dir", 'mnist_convolutional_logs','Summaries directory')
+flags.DEFINE_boolean("relevance", False,'Compute relevances')
 flags.DEFINE_string("relevance_method", 'simple','relevance methods: simple/eps/w^2/alphabeta')
 flags.DEFINE_boolean("save_model", False,'Save the trained model')
 flags.DEFINE_boolean("reload_model", False,'Restore the trained model')
@@ -102,15 +101,12 @@ def train():
         op = net.forward(inp)
         y = tf.squeeze(op)
         
-        train = net.fit(output=y,ground_truth=y_,loss='softmax_crossentropy',optimizer='adam', opt_params=[FLAGS.learning_rate])
+        trainer = net.fit(output=y,ground_truth=y_,loss='softmax_crossentropy',optimizer='adam', opt_params=[FLAGS.learning_rate])
     with tf.variable_scope('relevance'):
-        if FLAGS.relevance_bool:
-            #RELEVANCE = net.lrp(op, FLAGS.relevance_method, 1.0)
-            RELEVANCE = net.lrp(op, 'epsilon', 1e-8)
-            #RELEVANCE = net.lrp(op, 'ww', 0)
-            #RELEVANCE = net.lrp(op, 'flat', 0)
-            #RELEVANCE = net.lrp(op, 'alphabeta', 0.7)
+        if FLAGS.relevance:
+            LRP = net.lrp(op, FLAGS.relevance_method, 1e-8)
 
+            # LRP layerwise 
             relevance_layerwise = []
             # R = y
             # for layer in net.modules[::-1]:
@@ -118,7 +114,7 @@ def train():
             #     relevance_layerwise.append(R)
 
         else:
-            RELEVANCE=[]
+            LRP=[]
             relevance_layerwise = []
             
     with tf.name_scope('accuracy'):
@@ -133,8 +129,6 @@ def train():
     tf.global_variables_initializer().run()
     
     utils = Utils(sess, FLAGS.checkpoint_reload_dir)
-    # tvars = np.load(FLAGS.checkpoint_reload_dir+'/model.npy')
-    # for ii in range(8): sess.run(tf.trainable_variables()[ii].assign(tvars[ii]))
     if FLAGS.reload_model:
         utils.reload_model()
 
@@ -143,11 +137,11 @@ def train():
             d = feed_dict(mnist, False)
             test_inp = {x:d[0], y_: d[1], keep_prob: d[2]}
             #pdb.set_trace()
-            summary, acc , relevance_test, rel_layer= sess.run([merged, accuracy, RELEVANCE, relevance_layerwise], feed_dict=test_inp)
+            summary, acc , relevance_test, rel_layer= sess.run([merged, accuracy, LRP, relevance_layerwise], feed_dict=test_inp)
             test_writer.add_summary(summary, i)
             print('Accuracy at step %s: %f' % (i, acc))
-            print([np.sum(rel) for rel in rel_layer])
-            print(np.sum(relevance_test))
+            # print([np.sum(rel) for rel in rel_layer])
+            # print(np.sum(relevance_test))
             
             # save model if required
             if FLAGS.save_model:
@@ -156,15 +150,12 @@ def train():
         else:  
             d = feed_dict(mnist, True)
             inp = {x:d[0], y_: d[1], keep_prob: d[2]}
-            summary, _ , relevance_train,op, rel_layer= sess.run([merged, train.train, RELEVANCE,y, relevance_layerwise], feed_dict=inp)
+            summary, _ , relevance_train,op, rel_layer= sess.run([merged, trainer.train, LRP,y, relevance_layerwise], feed_dict=inp)
             train_writer.add_summary(summary, i)
             
-
-            #print(np.sum(op))
-    #pdb.set_trace()
             
     # relevances plotted with visually pleasing color schemes
-    if FLAGS.relevance_bool:
+    if FLAGS.relevance:
         #pdb.set_trace()
         relevance_test = relevance_test[:,2:30,2:30,:]
         # plot test images with relevances overlaid
