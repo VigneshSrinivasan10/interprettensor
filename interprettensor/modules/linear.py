@@ -100,7 +100,7 @@ class Linear(Module):
         '''
         self.R= R
         Z = tf.ones_like(tf.expand_dims(self.weights, 0))
-        Zs = tf.expand_dims( tf.reduce_sum(Z, 1), 1)
+        Zs = tf.reduce_sum(Z, 1, keep_dims=True) 
         return tf.reduce_sum((Z / Zs) * tf.expand_dims(self.R, 1),2)
                          
     def _ww_lrp(self,R):

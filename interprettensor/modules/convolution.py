@@ -123,12 +123,13 @@ class Convolution(Module):
         image_patches = tf.ones([self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth])
         #pdb.set_trace()
         ww = tf.square(self.weights)
-        self.Z = tf.expand_dims(ww,0)
+        Z = tf.expand_dims(ww,0)
         #self.Z = tf.expand_dims(tf.tile(tf.reshape(ww, [1,1,self.kernel_size, self.kernel_size, self.in_depth, self.output_depth]), [self.Hout, self.Wout, 1,1,1,1]), 0)
         #self.Z = tf.expand_dims(tf.square(self.weights), 0) * tf.expand_dims(image_patches, -1)
         #self.Zs = tf.reduce_sum(self.Z, [3,4,5], keep_dims=True)
-        self.Zs = tf.reduce_sum(self.Z, [1,2,3], keep_dims=True)
-        return self.compute_result()
+        Zs = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
+        result = self.compute_result(Z, Zs)
+        return self.restitch_image(result)
 
     def _flat_lrp(self,R):
         '''

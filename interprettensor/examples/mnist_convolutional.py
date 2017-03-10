@@ -109,7 +109,7 @@ def train():
             #RELEVANCE = net.lrp(op, 'epsilon', 1e-3)
             #RELEVANCE = net.lrp(op, 'ww', 0)
             #RELEVANCE = net.lrp(op, 'flat', 0)
-            RELEVANCE = net.lrp(op, 'alphabeta', 1)
+            RELEVANCE = net.lrp(op, 'alphabeta', 0.7)
 
             relevance_layerwise = []
             # R = y

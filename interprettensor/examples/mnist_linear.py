@@ -89,11 +89,11 @@ def train():
         
     with tf.variable_scope('relevance'):    
         if FLAGS.relevance_bool:
-            RELEVANCE = net.lrp(y, 'simple')
+            #RELEVANCE = net.lrp(y, 'simple')
             #RELEVANCE = net.lrp(y, 'epsilon', 1e-8)
             #RELEVANCE = net.lrp(y, 'ww', 1e-8)
             #RELEVANCE = net.lrp(y, 'flat', 1e-8)
-            #RELEVANCE = net.lrp(y, 'alphabeta', 0.5)
+            RELEVANCE = net.lrp(y, 'alphabeta', 0)
 
             # LRP layerwise 
             relevance_layerwise = []
@@ -116,7 +116,7 @@ def train():
     test_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/test')
 
     tf.global_variables_initializer().run()
-    pdb.set_trace()
+    #pdb.set_trace()
     # tvars = np.load('/home/srinivasan/Projects/interprettensor/interprettensor/examples/mnist_linear_model/model.npy')
     # for ii in range(8): sess.run(tf.trainable_variables()[ii].assign(tvars[ii]))
     
