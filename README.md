@@ -1,7 +1,16 @@
-This is a tensorflow wrapper which provides simple and accessible stand-alone implementations of LRP for artificial neural networks.
+# Interpret Tensor - Slim wrapper for Tensorflow to compute Layer-wise Relevance Propagation 
+
+The Layer-wise Relevance Propagation (LRP) algorithm explains a classifer's prediction specific to a given data point by attributing relevance scores to important components of the input by using the topology of the learned model itself.
+
+This tensorflow wrapper provides simple and accessible stand-alone implementations of LRP for artificial neural networks.
+
+<img src="doc/images/1.png" width="200" height="320">
+<img src="doc/images/2.png" width="200" height="320">
+<img src="doc/images/3.png" width="200" height="320">
+<img src="doc/images/4.png" width="200" height="320">
 
 ### Requirements
-    tensorflow >= 1.0.0alpha
+    tensorflow >= 1.0.0
     python == 2.7
     matplotlib >= 1.3.1
     scikit-image > 0.11.3
