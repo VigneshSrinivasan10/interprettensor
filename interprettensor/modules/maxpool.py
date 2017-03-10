@@ -25,11 +25,11 @@ from tensorflow.python.ops import sparse_ops
 
 class MaxPool(Module):
 
-    def __init__(self, pool_size=(2,2), pool_stride=None, pad = 'SAME',name='maxpool'):
+    def __init__(self, pool_size=2, pool_stride=None, pad = 'SAME',name='maxpool'):
         self.name = name
         Module.__init__(self)
         self.pool_size = pool_size
-        self.pool_kernel = [1]+[self.pool_size, self.pool_size]+[1]
+        self.pool_kernel = [1, self.pool_size, self.pool_size, 1]
         self.pool_stride = pool_stride
         if self.pool_stride is None:
             self.stride_size=self.pool_size
@@ -40,7 +40,7 @@ class MaxPool(Module):
         self.input_tensor = input_tensor
         #with tf.variable_scope(self.name):
         with tf.name_scope(self.name):
-            self.activations = tf.nn.max_pool(self.input_tensor, ksize=self.pool_size,strides=self.pool_stride,padding=self.pad, name=self.name )
+            self.activations = tf.nn.max_pool(self.input_tensor, ksize=self.pool_kernel,strides=self.pool_stride,padding=self.pad, name=self.name )
             tf.summary.histogram('activations', self.activations)
 
         return self.activations
