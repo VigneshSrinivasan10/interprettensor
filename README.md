@@ -12,11 +12,10 @@ This is a tensorflow wrapper which provides simple and accessible stand-alone im
 
 This TF-wrapper considers the layers in the neural network to be in the form of a Sequence. A quick way to define a network would be
 
-        net = Sequential([Linear(784,500, input_shape=(FLAGS.batch_size,784)), 
-                     Relu(),
-                     Linear(500, 100), 
-                     Relu(),
-                     Linear(100, 10), 
+        net = Sequential([Linear(input_dim=784,output_dim=1296, act ='relu', batch_size=FLAGS.batch_size),
+                     Linear(1296, act ='relu'), 
+                     Linear(1296, act ='relu'),
+                     Linear(10, act ='relu'),
                      Softmax()])
 
         output = net.forward(input_data)
@@ -25,7 +24,7 @@ This TF-wrapper considers the layers in the neural network to be in the form of 
 
 This `net` can then be used to propogate and optimize using
 
-        train = net.fit(output, ground_truth, loss, optimizer)
+        train = net.fit(output, ground_truth, loss='softmax_crossentropy', optimizer='adam', opt_params=[FLAGS.learning_rate])
 
 ## 3. LRP - Layer-wise relevance propagation
 
@@ -35,8 +34,7 @@ And compute the contributions of the input pixels towards the decision by
 
 the different lrp variants available are:
 
-        'simple'and 'epsilon'
-        To-do: 'flat','w^2' and 'alphabeta' 
+        'simple'and 'epsilon','flat','ww' and 'alphabeta' 
 
 ## 4. Compute relevances every layer backwards from the output to the input  
 
