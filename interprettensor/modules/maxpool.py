@@ -105,7 +105,7 @@ class MaxPool(Module):
         return tf.reshape(image_patches, [self.in_N, self.Hout,self.Wout, self.pool_size,self.pool_size, self.in_depth])
         
     def compute_z(self, image_patches):
-        Z = tf.equal( tf.reshape(self.activations, [self.in_N, self.Hout,self.Wout,1,1,self.output_depth]), image_patches)
+        Z = tf.equal( tf.reshape(self.activations, [self.in_N, self.Hout,self.Wout,1,1,self.in_depth]), image_patches)
         return tf.where(Z, tf.ones_like(Z, dtype=tf.float32), tf.zeros_like(Z,dtype=tf.float32) )
         
         

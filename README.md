@@ -71,4 +71,24 @@ It downloads and extract the mnist datset, runs it on a neural netowrk and plots
 Follow steps (1) and (3) from Features mentioned above.
 
 
+# The LRP Toolbox Paper
+
+When using (any part) of this wrapper, please cite [our paper](http://jmlr.org/papers/volume17/15-618/15-618.pdf)
+
+    @article{JMLR:v17:15-618,
+        author  = {Sebastian Lapuschkin and Alexander Binder and Gr{{\'e}}goire Montavon and Klaus-Robert M{{{\"u}}}ller and Wojciech Samek},
+        title   = {The LRP Toolbox for Artificial Neural Networks},
+        journal = {Journal of Machine Learning Research},
+        year    = {2016},
+        volume  = {17},
+        number  = {114},
+        pages   = {1-5},
+        url     = {http://jmlr.org/papers/v17/15-618.html}
+    }
+
+
+    
+# Misc
+
+For further research and projects involving LRP, visit [heatmapping.org](http://heatmapping.org)
    
