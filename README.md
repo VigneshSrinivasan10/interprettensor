@@ -4,10 +4,7 @@ The Layer-wise Relevance Propagation (LRP) algorithm explains a classifer's pred
 
 This tensorflow wrapper provides simple and accessible stand-alone implementations of LRP for artificial neural networks.
 
-<img src="doc/images/1.png" width="215" height="215">
-<img src="doc/images/2.png" width="215" height="215">
-<img src="doc/images/3.png" width="215" height="215">
-<img src="doc/images/4.png" width="215" height="215">
+<img src="doc/images/1.png" width="215" height="215"> <img src="doc/images/2.png" width="215" height="215"> <img src="doc/images/3.png" width="215" height="215"> <img src="doc/images/4.png" width="215" height="215">
 
 ### Requirements
     tensorflow >= 1.0.0
