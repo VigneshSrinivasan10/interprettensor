@@ -21,7 +21,7 @@ class Linear(Module):
     Linear Layer
     '''
 
-    def __init__(self, output_dim, batch_size=None, input_dim = None, act = 'linear', keep_prob=1.0, name="linear"):
+    def __init__(self, output_dim, batch_size=None, input_dim = None, act = 'linear', keep_prob=tf.constant(1.0), name="linear"):
         self.name = name
         Module.__init__(self)
 
@@ -57,8 +57,18 @@ class Linear(Module):
             elif hasattr(self.act, '__call__'):
                 self.activations = self.act(conv)
 
-            if self.keep_prob<1.0:
-                self.activations = tf.nn.dropout(self.activations, keep_prob=self.keep_prob)
+            def dropout_check_false():
+                #print('Dropout adjusted 1.0')
+                return tf.constant(1.0)
+                
+            def dropout_check_true():
+                return tf.multiply(self.keep_prob, 1)
+                
+            dropout_check = self.keep_prob<=tf.constant(1.0)
+            import pdb; pdb.set_trace()
+            dropout = tf.cond(dropout_check, dropout_check_true, dropout_check_false)
+            
+            self.activations = tf.nn.dropout(self.activations, keep_prob=dropout)
             #activations = activation_fn(conv, name='activation')
             tf.summary.histogram('activations', self.activations)
             tf.summary.histogram('weights', self.weights)

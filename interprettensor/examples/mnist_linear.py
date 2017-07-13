@@ -22,6 +22,7 @@ from modules.linear import Linear
 from modules.softmax import Softmax
 from modules.relu import Relu
 from modules.tanh import Tanh
+from modules.avgpool import AvgPool
 from modules.convolution import Convolution
 import modules.render as render
 from modules.utils import Utils, Summaries, plot_relevances
@@ -126,7 +127,7 @@ def train():
     # iterate over train and test data
     for i in range(FLAGS.max_steps):
         if i % FLAGS.test_every == 0:
-            # pdb.set_trace()
+            pdb.set_trace()
             d = feed_dict(mnist, False)
             test_inp = {x:d[0], y_:d[1], keep_prob:d[2]}
             summary, acc , relevance_test, op, rel_layer= sess.run([merged, accuracy, LRP,y, relevance_layerwise], feed_dict=test_inp)

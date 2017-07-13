@@ -57,6 +57,21 @@ FLAGS = flags.FLAGS
 
 def nn():
     
+    return Sequential([Convolution(output_depth=6,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28, act ='relu', stride_size=1, pad='VALID'),
+                       AvgPool(),
+
+                       Convolution(output_depth=15,stride_size=1, act ='relu', pad='VALID'),
+                       AvgPool(),
+                       
+                       Convolution(kernel_size=4,output_depth=60,stride_size=1, act ='relu', pad='VALID'),
+                       AvgPool(),
+                       
+                       Convolution(kernel_size=1, output_depth=10,stride_size=1, pad='VALID'),
+                       Softmax()])
+
+
+def nn1():
+    
     return Sequential([Convolution(output_depth=10,input_depth=1,batch_size=FLAGS.batch_size, input_dim=28, act ='relu', stride_size=1, pad='VALID'),
                        AvgPool(),
 
