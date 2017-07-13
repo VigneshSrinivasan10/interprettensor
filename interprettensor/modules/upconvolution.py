@@ -23,7 +23,7 @@ class Upconvolution(Module):
     Convolutional transpose Layer
     '''
 
-    def __init__(self, output_depth, input_depth=None, batch_size=None, input_dim=None, kernel_size=5, stride_size=2, act = 'linear', keep_prob=1.0, pad = 'SAME',name="deconv2d"):
+    def __init__(self, output_depth, input_depth=None, batch_size=None, input_dim=None, kernel_size=5, stride_size=2, act = 'linear', keep_prob=1.0, pad = 'SAME',weights_init= tf.truncated_normal_initializer(stddev=0.01), bias_init= tf.constant_initializer(0.0), name="deconv2d"):
         self.name = name
         Module.__init__(self)
         
@@ -37,6 +37,9 @@ class Upconvolution(Module):
         self.keep_prob = keep_prob
         self.act = act
         self.pad = pad
+
+        self.weights_init = weights_init
+        self.bias_init = bias_init
         
     def check_input_shape(self):
         inp_shape = self.input_tensor.get_shape().as_list()
@@ -63,8 +66,8 @@ class Upconvolution(Module):
         
         self.strides = [1,self.stride_size, self.stride_size,1]
         with tf.variable_scope(self.name):
-            self.weights = variables.weights(self.weights_shape)
-            self.biases = variables.biases(self.output_depth)
+            self.weights = variables.weights(self.weights_shape, initializer=self.weights_init, name=self.name)
+            self.biases = variables.biases(self.output_depth, initializer=self.bias_init, name=self.name)
         
        
         with tf.name_scope(self.name):

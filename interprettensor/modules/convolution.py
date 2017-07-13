@@ -30,7 +30,7 @@ class Convolution(Module):
     Convolutional Layer
     '''
 
-    def __init__(self, output_depth, batch_size=None, input_dim = None, input_depth=None, kernel_size=5, stride_size=2, act = 'linear', keep_prob=1.0, pad = 'SAME',name="conv2d"):
+    def __init__(self, output_depth, batch_size=None, input_dim = None, input_depth=None, kernel_size=5, stride_size=2, act = 'linear', keep_prob=1.0, pad = 'SAME', weights_init= tf.truncated_normal_initializer(stddev=0.01), bias_init= tf.constant_initializer(0.0), name="conv2d"):
         self.name = name
         #self.input_tensor = input_tensor
         Module.__init__(self)
@@ -47,6 +47,10 @@ class Convolution(Module):
         self.act = act
         self.keep_prob = keep_prob
         self.pad = pad
+
+        self.weights_init = weights_init
+        self.bias_init = bias_init
+
         
 
     def check_input_shape(self):
@@ -68,8 +72,8 @@ class Convolution(Module):
         self.weights_shape = [self.kernel_size, self.kernel_size, self.in_depth, self.output_depth]
         self.strides = [1,self.stride_size, self.stride_size,1]
         with tf.variable_scope(self.name):
-            self.weights = variables.weights(self.weights_shape)
-            self.biases = variables.biases(self.output_depth)
+            self.weights = variables.weights(self.weights_shape, initializer=self.weights_init, name=self.name)
+            self.biases = variables.biases(self.output_depth, initializer=self.bias_init, name=self.name)
         
         with tf.name_scope(self.name):
             conv = tf.nn.conv2d(self.input_tensor, self.weights, strides = self.strides, padding=self.pad)

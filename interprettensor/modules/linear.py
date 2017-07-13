@@ -21,7 +21,7 @@ class Linear(Module):
     Linear Layer
     '''
 
-    def __init__(self, output_dim, batch_size=None, input_dim = None, act = 'linear', keep_prob=tf.constant(1.0), name="linear"):
+    def __init__(self, output_dim, batch_size=None, input_dim = None, act = 'linear', keep_prob=tf.constant(1.0), weights_init= tf.truncated_normal_initializer(stddev=0.01), bias_init= tf.constant_initializer(0.0), name="linear"):
         self.name = name
         Module.__init__(self)
 
@@ -30,7 +30,9 @@ class Linear(Module):
         self.batch_size = batch_size
         self.act = act
         self.keep_prob = keep_prob
-        
+
+        self.weights_init = weights_init
+        self.bias_init = bias_init
         
     def forward(self, input_tensor):
         self.input_tensor = input_tensor
@@ -46,8 +48,8 @@ class Linear(Module):
             self.input_dim = inp_shape[1]
         self.weights_shape = [self.input_dim, self.output_dim]
         #with tf.name_scope(self.name):
-        self.weights = variables.weights(self.weights_shape, name=self.name)
-        self.biases = variables.biases(self.output_dim, name=self.name)
+        self.weights = variables.weights(self.weights_shape, initializer=self.weights_init, name=self.name)
+        self.biases = variables.biases(self.output_dim, initializer=self.bias_init, name=self.name)
 
         #import pdb;pdb.set_trace()
         with tf.name_scope(self.name):
