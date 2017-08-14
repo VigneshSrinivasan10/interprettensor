@@ -53,7 +53,7 @@ flags.DEFINE_string("checkpoint_dir", 'mnist_linear_model','Checkpoint dir')
 FLAGS = flags.FLAGS
 
 def nn():
-    return Sequential([Linear(input_dim=784,output_dim=1296, act ='relu', batch_size=FLAGS.batch_size),
+    return Sequential([Linear(input_dim=784,output_dim=1296, act ='relu', batch_size=FLAGS.batch_size, keep_prob=0.8),
                      Linear(1296, act ='relu'), 
                      Linear(1296, act ='relu'),
                      Linear(10, act ='relu'),

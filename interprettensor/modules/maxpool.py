@@ -280,17 +280,27 @@ class MaxPool(Module):
         ksize_c_eff = ksize_c + (ksize_c - 1) * (rate_c - 1)
 
         if padding == 'SAME':
+          if rows_out * 2 != rows_in:
+            rows_out = int(ceil((rows_in+1) / stride_r))
+            cols_out = int(ceil((cols_in+1) / stride_h))
+          else:    
             rows_out = int(ceil(rows_in / stride_r))
             cols_out = int(ceil(cols_in / stride_h))
-            pad_rows = ((rows_out - 1) * stride_r + ksize_r_eff - rows_in) // 2
-            pad_cols = ((cols_out - 1) * stride_h + ksize_c_eff - cols_in) // 2
+          pad_rows = ((rows_out - 1) * stride_r + ksize_r_eff - rows_in) // 2
+          pad_cols = ((cols_out - 1) * stride_h + ksize_c_eff - cols_in) // 2
 
         elif padding == 'VALID':
+          if rows_out * 2 != rows_in:
+            rows_out = int(ceil(((rows_in+1) - ksize_r_eff + 1) / stride_r))
+            cols_out = int(ceil(((cols_in+1) - ksize_c_eff + 1) / stride_h))
+          else:    
             rows_out = int(ceil((rows_in - ksize_r_eff + 1) / stride_r))
             cols_out = int(ceil((cols_in - ksize_c_eff + 1) / stride_h))
-            pad_rows = (rows_out - 1) * stride_r + ksize_r_eff - rows_in
-            pad_cols = (cols_out - 1) * stride_h + ksize_c_eff - cols_in
+          pad_rows = (rows_out - 1) * stride_r + ksize_r_eff - rows_in
+          pad_cols = (cols_out - 1) * stride_h + ksize_c_eff - cols_in
 
+
+        
         pad_rows, pad_cols = max(0, pad_rows), max(0, pad_cols)
 
         grad_expanded = array_ops.transpose(

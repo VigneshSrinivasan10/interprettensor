@@ -67,7 +67,7 @@ class Linear(Module):
                 return tf.multiply(self.keep_prob, 1)
                 
             dropout_check = self.keep_prob<=tf.constant(1.0)
-            #import pdb; pdb.set_trace()
+            
             dropout = tf.cond(dropout_check, dropout_check_true, dropout_check_false)
             
             self.activations = tf.nn.dropout(self.activations, keep_prob=dropout)
