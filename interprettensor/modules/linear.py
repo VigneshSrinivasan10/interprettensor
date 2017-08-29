@@ -131,7 +131,7 @@ class Linear(Module):
         self.R= R
         Z = tf.expand_dims(self.weights, 0) * tf.expand_dims(self.input_tensor, -1)
         Zs = tf.expand_dims(tf.reduce_sum(Z, 1), 1) + tf.expand_dims(tf.expand_dims(self.biases, 0), 0)
-        Zs += epsilon * tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs)*-1, tf.ones_like(Zs))
+        Zs += epsilon * tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs), tf.ones_like(Zs)*-1)
 
         return tf.reduce_sum((Z / Zs) * tf.expand_dims(self.R, 1),2)
 

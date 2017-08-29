@@ -33,7 +33,9 @@ class MaxPool(Module):
         self.pool_stride = pool_stride
         if self.pool_stride is None:
             self.stride_size=self.pool_size
-            self.pool_stride=[1, self.stride_size, self.stride_size, 1] 
+        else:
+            self.stride_size=self.pool_stride
+        self.pool_stride=[1, self.stride_size, self.stride_size, 1] 
         self.pad = pad
         
     def forward(self,input_tensor, batch_size=10, img_dim=28):
