@@ -31,3 +31,9 @@ def elu(input_tensor):
 
 def linear(input_tensor):
     return input_tensor
+
+def lrelu(input_tensor, leak=0.2):
+    return tf.maximum(input_tensor, leak*input_tensor)
+
+def sigmoid(input_tensor):
+    return tf.nn.sigmoid(input_tensor)

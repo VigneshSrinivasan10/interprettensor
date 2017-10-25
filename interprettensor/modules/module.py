@@ -30,13 +30,14 @@ class Module:
         
         if hasattr(self, 'name'):
             self.name = self.name+'_'+str(layer_count)
+
             #self.previous_input=self.
             #print 'LAYER COUNT: '+str(layer_count)
         #values for presetting lrp decomposition parameters per layer
         self.lrp_var = None
         self.lrp_param = 1.
         #self.input_shape = self.input_shape
-        # import pdb;pdb.set_trace()
+        # 
         # self.forward(self.input_tensor)
         
     def forward(self,X):

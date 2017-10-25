@@ -30,7 +30,7 @@ class Convolution(Module):
     Convolutional Layer
     '''
 
-    def __init__(self, output_depth, batch_size=None, input_dim = None, input_depth=None, kernel_size=5, stride_size=2, act = 'linear', keep_prob=1.0, pad = 'SAME', weights_init= tf.truncated_normal_initializer(stddev=0.01), bias_init= tf.constant_initializer(0.0), name="conv2d"):
+    def __init__(self, output_depth, batch_size=None, input_dim = None, input_depth=None, kernel_size=5, stride_size=2, act = 'linear', batch_norm = False, batch_norm_params = {'momentum':0.9, 'epsilon':1e-5, 'training':False ,'name':'bn'}, keep_prob=1.0, pad = 'SAME', weights_init= tf.truncated_normal_initializer(stddev=0.01), bias_init= tf.constant_initializer(0.0), name="conv2d"):
         self.name = name
         #self.input_tensor = input_tensor
         Module.__init__(self)
@@ -46,6 +46,9 @@ class Convolution(Module):
         self.stride_size = stride_size
         self.act = act
         self.keep_prob = keep_prob
+        self.batch_norm = batch_norm
+        self.batch_norm_params = batch_norm_params
+
         self.pad = pad
 
         self.weights_init = weights_init
@@ -71,13 +74,22 @@ class Convolution(Module):
         # init weights
         self.weights_shape = [self.kernel_size, self.kernel_size, self.in_depth, self.output_depth]
         self.strides = [1,self.stride_size, self.stride_size,1]
-        with tf.variable_scope(self.name):
+        with tf.name_scope(self.name):
             self.weights = variables.weights(self.weights_shape, initializer=self.weights_init, name=self.name)
             self.biases = variables.biases(self.output_depth, initializer=self.bias_init, name=self.name)
         
         with tf.name_scope(self.name):
             conv = tf.nn.conv2d(self.input_tensor, self.weights, strides = self.strides, padding=self.pad)
             conv = tf.reshape(tf.nn.bias_add(conv, self.biases), conv.get_shape().as_list())
+
+            if self.batch_norm:
+                self.momentum = self.batch_norm_params['momentum']
+                self.epsilon = self.batch_norm_params['epsilon']
+                self.training = self.batch_norm_params['training']
+                self.bn_name = self.batch_norm_params['name'] 
+                conv = tf.contrib.layers.batch_norm(conv, decay=self.momentum, 
+                                        updates_collections=None, epsilon=self.epsilon,
+                                                      scale=True, is_training=self.training, scope=self.bn_name)
 
             if isinstance(self.act, str): 
                 self.activations = activations.apply(conv, self.act)
@@ -189,7 +201,7 @@ class Convolution(Module):
         return tf.multiply(tf.expand_dims(self.weights, 0), tf.expand_dims(image_patches, -1))
         
     def compute_zs(self, Z, stabilizer=True, epsilon=1e-12):
-        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  #+ tf.expand_dims(self.biases, 0)
+        Zs = tf.reduce_sum(Z, [3,4,5], keep_dims=True)  + tf.expand_dims(self.biases, 0)
         if stabilizer==True:
             stabilizer = epsilon*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
             Zs += stabilizer

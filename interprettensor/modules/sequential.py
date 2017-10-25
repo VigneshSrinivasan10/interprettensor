@@ -69,7 +69,6 @@ class Sequential(Module):
             m.batch_size=self.modules[0].batch_size
             print m.name+'::',
             print X.get_shape().as_list()
-            
             X = m.forward(X)
             
         print '\n'+ '------------------------------------------------- '

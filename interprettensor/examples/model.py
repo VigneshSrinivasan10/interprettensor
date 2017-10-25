@@ -25,6 +25,7 @@ from modules.tanh import Tanh
 from modules.convolution import Convolution
 import modules.render as render
 import input_data
+from modules.utils import Utils, Summaries, plot_relevances
 
 import argparse
 import tensorflow as tf
@@ -41,54 +42,32 @@ flags.DEFINE_integer("batch_size", 200,'Number of steps to run trainer.')
 flags.DEFINE_string("data_dir", 'data','Directory for storing data')
 flags.DEFINE_string("summaries_dir", 'my_model_logs','Summaries directory')
 flags.DEFINE_boolean("relevance", True,'Compute relevances')
-flags.DEFINE_string("checkpoint_dir", '/home/srinivasan/Projects/interprettensor/interprettensor/examples/mnist_linear_model','Checkpoint dir')
+flags.DEFINE_string("checkpoint_dir", 'mnist_linear_model','Checkpoint dir')
 
 
 FLAGS = flags.FLAGS
-
-def visualize(relevances, images_tensor):
-    n, dim = relevances.shape
-    heatmap = relevances.reshape([n,28,28,1])
-    input_images = images_tensor.reshape([n,28,28,1])
-    heatmaps = []
-    for h,heat in enumerate(heatmap):
-        input_image = input_images[h]
-        maps = render.hm_to_rgb(heat, input_image, scaling = 3, sigma = 2)
-        heatmaps.append(maps)
-    R = np.array(heatmaps)
-    with tf.name_scope('input_reshape'):
-        img = tf.summary.image('input', tf.cast(R, tf.float32), n)
-    return img.eval()
 
 
 def init_vars(sess):
     saver = tf.train.Saver()
     tf.global_variables_initializer().run()
-    #tf.initialize_all_variables().run()
-    #pdb.set_trace()
     ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
     try: 
         if ckpt and ckpt.model_checkpoint_path:
             print('Reloading from -- '+FLAGS.checkpoint_dir+'/model.ckpt')
             saver.restore(sess, ckpt.model_checkpoint_path)
         else:
-            tvars = np.load('/home/srinivasan/Projects/interprettensor/interprettensor/examples/mnist_linear_model/model.npy')
+            tvars = np.load('mnist_linear_model/model.npy')
             for ii in range(8): sess.run(tf.trainable_variables()[ii].assign(tvars[ii]))
-            pdb.set_trace()
-            print('No model found!')
+            print('Reloading from numpy array!')
     except:
         raise ValueError('Layer definition and model layers mismatch!')
     return saver
-
-def plot_relevances(rel, img, writer):
-    img_summary = visualize(rel, img)
-    writer.add_summary(img_summary)
-    writer.flush()
     
-def layers(x):
+def layers():
     # Define the layers of your network here
     
-    return Sequential([Linear(input_dim=784,output_dim=1296, act='relu', batch_size=FLAGS.batch_size),                     
+    return Sequential([Linear(input_dim=784,output_dim=1296, act='relu', batch_size=FLAGS.batch_size),                    
                      Linear(1296, act='relu'), 
                      Linear(1296, act='relu'),
                      Linear(10),
@@ -102,7 +81,7 @@ def test():
     with tf.Session() as sess:
         x = tf.placeholder(tf.float32, [FLAGS.batch_size, 784], name='input')
         with tf.variable_scope('model'):
-            my_netowrk = layers(x)
+            my_netowrk = layers()
             output = my_netowrk.forward(x)
             if FLAGS.relevance:
                 RELEVANCE = my_netowrk.lrp(output, 'simple', 1.0)
@@ -121,7 +100,10 @@ def test():
         test_writer.add_summary(summary, 0)
 
         # Save the images as heatmaps to visualize on tensorboard
-        plot_relevances(relevance_test, xs, test_writer)
+        images = test_inp[test_inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
+        images = (images + 1)/2.0
+        plot_relevances(relevance_test.reshape([FLAGS.batch_size,28,28,1]), images, test_writer )
+
         test_writer.close()
     
 def main(_):

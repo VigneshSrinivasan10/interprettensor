@@ -53,11 +53,14 @@ class Summaries():
 
 
 class Utils():
-    def __init__(self, session, checkpoint_dir=None, name="utils"):
+    def __init__(self, session, checkpoint_dir=None, var_list = None, name="utils"):
         self.name = name
         self.session = session
         self.checkpoint_dir = checkpoint_dir
-        self.saver = tf.train.Saver()
+        if var_list:
+            self.saver = tf.train.Saver(var_list)
+        else:
+            self.saver = tf.train.Saver()
         
 
     def reload_model(self):

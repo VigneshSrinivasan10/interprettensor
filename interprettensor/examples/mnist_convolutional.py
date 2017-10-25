@@ -100,7 +100,7 @@ def train():
         inp = tf.pad(tf.reshape(x, [FLAGS.batch_size,28,28,1]), [[0,0],[2,2],[2,2],[0,0]])
         op = net.forward(inp)
         y = tf.squeeze(op)
-        
+        #tf.summary.image('inp',inp, max_outputs= 100 )
         trainer = net.fit(output=y,ground_truth=y_,loss='softmax_crossentropy',optimizer='adam', opt_params=[FLAGS.learning_rate])
     with tf.variable_scope('relevance'):
         if FLAGS.relevance:
@@ -127,19 +127,23 @@ def train():
     test_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/test')
 
     tf.global_variables_initializer().run()
-    
     utils = Utils(sess, FLAGS.checkpoint_reload_dir)
     if FLAGS.reload_model:
-        utils.reload_model()
-
+        tvars = tf.trainable_variables()
+        npy_files = np.load('mnist_trained_model/model.npy')
+        [sess.run(tv.assign(npy_files[tt])) for tt,tv in enumerate(tvars)]
+        #utils.reload_model()
+    
     for i in range(FLAGS.max_steps):
         if i % FLAGS.test_every == 0:  # test-set accuracy
             d = feed_dict(mnist, False)
             test_inp = {x:d[0], y_: d[1], keep_prob: d[2]}
             #pdb.set_trace()
-            summary, acc , relevance_test, rel_layer= sess.run([merged, accuracy, LRP, relevance_layerwise], feed_dict=test_inp)
+            
+            summary, acc , y1, relevance_test, rel_layer= sess.run([merged, accuracy, y, LRP, relevance_layerwise], feed_dict=test_inp)
             test_writer.add_summary(summary, i)
             print('Accuracy at step %s: %f' % (i, acc))
+            #pdb.set_trace()
             # print([np.sum(rel) for rel in rel_layer])
             # print(np.sum(relevance_test))
             
@@ -150,7 +154,9 @@ def train():
         else:  
             d = feed_dict(mnist, True)
             inp = {x:d[0], y_: d[1], keep_prob: d[2]}
-            summary, _ , relevance_train,op, rel_layer= sess.run([merged, trainer.train, LRP,y, relevance_layerwise], feed_dict=inp)
+            summary, _ , acc, relevance_train,op, rel_layer= sess.run([merged, trainer.train,accuracy, LRP,y, relevance_layerwise], feed_dict=inp)
+            #summary, acc , y1, relevance_test, rel_layer= sess.run([merged, accuracy, y, LRP, relevance_layerwise], feed_dict=test_inp)
+            print('Accuracy at step %s: %f' % (i, acc))
             train_writer.add_summary(summary, i)
             
             

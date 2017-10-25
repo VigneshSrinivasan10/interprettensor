@@ -21,7 +21,7 @@ class Linear(Module):
     Linear Layer
     '''
 
-    def __init__(self, output_dim, batch_size=None, input_dim = None, act = 'linear', keep_prob=tf.constant(1.0), weights_init= tf.truncated_normal_initializer(stddev=0.01), bias_init= tf.constant_initializer(0.0), name="linear"):
+    def __init__(self, output_dim, batch_size=None, input_dim = None, act = 'linear', batch_norm = False, batch_norm_params = {'momentum':0.9, 'epsilon':1e-5, 'training':False,'name':'bn'}, keep_prob=tf.constant(1.0), weights_init= tf.truncated_normal_initializer(stddev=0.01), bias_init= tf.constant_initializer(0.0), name="linear"):
         self.name = name
         Module.__init__(self)
 
@@ -29,6 +29,9 @@ class Linear(Module):
         self.output_dim = output_dim
         self.batch_size = batch_size
         self.act = act
+        self.batch_norm = batch_norm
+        self.batch_norm_params = batch_norm_params
+        
         self.keep_prob = keep_prob
 
         self.weights_init = weights_init
@@ -38,8 +41,6 @@ class Linear(Module):
         self.input_tensor = input_tensor
         inp_shape = self.input_tensor.get_shape().as_list()
 
-
-        #import pdb;pdb.set_trace()
         if len(inp_shape)!=2:
             import numpy as np
             self.input_dim =  np.prod(inp_shape[1:])
@@ -47,13 +48,22 @@ class Linear(Module):
         else:
             self.input_dim = inp_shape[1]
         self.weights_shape = [self.input_dim, self.output_dim]
-        #with tf.name_scope(self.name):
-        self.weights = variables.weights(self.weights_shape, initializer=self.weights_init, name=self.name)
-        self.biases = variables.biases(self.output_dim, initializer=self.bias_init, name=self.name)
+        with tf.name_scope(self.name):
+            self.weights = variables.weights(self.weights_shape, initializer=self.weights_init, name=self.name)
+            self.biases = variables.biases(self.output_dim, initializer=self.bias_init, name=self.name)
 
-        #import pdb;pdb.set_trace()
+            
         with tf.name_scope(self.name):
             linear = tf.nn.bias_add(tf.matmul(self.input_tensor, self.weights), self.biases, name=self.name)
+            if self.batch_norm:
+                self.momentum = self.batch_norm_params['momentum']
+                self.epsilon = self.batch_norm_params['epsilon']
+                self.training = self.batch_norm_params['training']
+                self.bn_name = self.batch_norm_params['name'] 
+                linear = tf.contrib.layers.batch_norm(linear, decay=self.momentum, 
+                                        updates_collections=None, epsilon=self.epsilon,
+                                                      scale=True, is_training=self.training, scope=self.bn_name)
+                                        
             if isinstance(self.act, str): 
                 self.activations = activations.apply(linear, self.act)
             elif hasattr(self.act, '__call__'):
