@@ -64,7 +64,8 @@ class Sequential(Module):
         
         
         print('Forward Pass ... ')
-        print '------------------------------------------------- '
+        print('------------------------------------------------- ')
+        
         for m in self.modules:
             m.batch_size=self.modules[0].batch_size
             print(m.name+'::',end=' ')
