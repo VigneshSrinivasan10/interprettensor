@@ -63,15 +63,15 @@ class Sequential(Module):
                 raise ValueError('Expects batch_input_shape= AND input_dim= for the first layer ')
         
         
-        print 'Forward Pass ... '
+        print('Forward Pass ... ')
         print '------------------------------------------------- '
         for m in self.modules:
             m.batch_size=self.modules[0].batch_size
-            print m.name+'::',
-            print X.get_shape().as_list()
+            print(m.name+'::',end=' ')
+            print(X.get_shape().as_list())
             X = m.forward(X)
             
-        print '\n'+ '------------------------------------------------- '
+        print('\n'+ '------------------------------------------------- ')
         
         return X
 
@@ -147,23 +147,23 @@ class Sequential(Module):
         for which the explanation is to be computed. calling clean in between forward and lrp invalidates the
         temporary data
         '''
-        print 'Computing LRP ... '
-        print '------------------------------------------------- '
+        print('Computing LRP ... '
+        print('------------------------------------------------- ')
 
         for m in self.modules[::-1]:
             R = m.lrp(R,lrp_var,param)
-            print m.name+'::',
-            print R.get_shape().as_list()
+            print(m.name+'::',end=' ')
+            print(R.get_shape().as_list())
             
-        print '\n'+'------------------------------------------------- '
+        print('\n'+'------------------------------------------------- ')
 
         return R
 
     def lrp_layerwise(self, m, R,lrp_var=None,param=None):
         R = m.lrp(R,lrp_var,param)
         m.clean()
-        print m.name+'::',
-        print R.get_shape().as_list()
+        print(m.name+'::',end=' ')
+        print(R.get_shape().as_list())
         return R
     
     def fit(self,output=None,ground_truth=None,loss='CE', optimizer='Adam', opt_params=[]):

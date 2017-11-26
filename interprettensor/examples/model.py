@@ -100,9 +100,10 @@ def test():
         test_writer.add_summary(summary, 0)
 
         # Save the images as heatmaps to visualize on tensorboard
-        images = test_inp[test_inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
+        images = xs.reshape([FLAGS.batch_size,28,28,1])
         images = (images + 1)/2.0
-        plot_relevances(relevance_test.reshape([FLAGS.batch_size,28,28,1]), images, test_writer )
+        relevances = relevance_test.reshape([FLAGS.batch_size,28,28,1])
+        plot_relevances(relevances, images, test_writer )
 
         test_writer.close()
     
