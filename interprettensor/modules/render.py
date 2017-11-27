@@ -40,10 +40,10 @@ def vec2im(V, shape = () ):
         with W.shape = shape or W.shape = [np.sqrt(V.size)]*2
 
     '''
-
+    
     if len(shape) < 2:
         shape = [np.sqrt(V.size)]*2
-        shape = map(int, shape)
+        shape = list(map(int, shape))
     return np.reshape(V, shape)
 
 
@@ -71,7 +71,7 @@ def enlarge_image(img, scaling = 3):
     '''
 
     if scaling < 1 or not isinstance(scaling,int):
-        print 'scaling factor needs to be an int >= 1'
+        print('scaling factor needs to be an int >= 1')
 
     if len(img.shape) == 2:
         H,W = img.shape
@@ -210,7 +210,6 @@ def hm_to_rgb(R, X = None, scaling = 3, shape = (), sigma = 2, cmap = 'jet', nor
         R = R / np.max(np.abs(R)) # normalize to [-1,1] wrt to max relevance magnitude
         R = (R + 1.)/2. # shift/normalize to [0,1] for color mapping
 
-
     R = enlarge_image(vec2im(R,shape), scaling)
     rgb = cmap(R.flatten())[...,0:3].reshape([R.shape[0],R.shape[1],3])
     #rgb = repaint_corner_pixels(rgb, scaling) #obsolete due to directly calling the color map with [0,1]-normalized inputs
@@ -221,9 +220,9 @@ def hm_to_rgb(R, X = None, scaling = 3, shape = (), sigma = 2, cmap = 'jet', nor
         Rdims = R.shape
 
         if not np.all(xdims == Rdims):
-            print 'transformed heatmap and data dimension mismatch. data dimensions differ?'
-            print 'R.shape = ',Rdims, 'X.shape = ', xdims
-            print 'skipping drawing of outline\n'
+            print('transformed heatmap and data dimension mismatch. data dimensions differ?')
+            print('R.shape = ',Rdims, 'X.shape = ', xdims)
+            print('skipping drawing of outline\n')
         else:
             #edges = skimage.filters.canny(X, sigma=sigma)
             edges = skimage.feature.canny(X, sigma=sigma)
@@ -266,17 +265,17 @@ def save_image(rgb_images, path, gap = 2):
             gap = np.zeros((sz[0],gap,sz[2]))
             continue
         if not sz[0] == rgb_images[i].shape[0] and sz[1] == rgb_images[i].shape[2]:
-            print 'image',i, 'differs in size. unable to perform horizontal alignment'
-            print 'expected: Hx_xD = {0}x_x{1}'.format(sz[0],sz[1])
-            print 'got     : Hx_xD = {0}x_x{1}'.format(rgb_images[i].shape[0],rgb_images[i].shape[1])
-            print 'skipping image\n'
+            print('image',i, 'differs in size. unable to perform horizontal alignment')
+            print('expected: Hx_xD = {0}x_x{1}'.format(sz[0],sz[1]))
+            print('got     : Hx_xD = {0}x_x{1}'.format(rgb_images[i].shape[0],rgb_images[i].shape[1]))
+            print('skipping image\n')
         else:
             image = np.hstack((image,gap,rgb_images[i]))
 
     image *= 255
     image = image.astype(np.uint8)
 
-    print 'saving image to ', path
+    print('saving image to ', path)
     skimage.io.imsave(path,image)
     return image
 
