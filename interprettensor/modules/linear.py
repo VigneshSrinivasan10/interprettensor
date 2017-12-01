@@ -76,11 +76,11 @@ class Linear(Module):
             def dropout_check_true():
                 return tf.multiply(self.keep_prob, 1)
                 
-            dropout_check = self.keep_prob<=tf.constant(1.0)
+            # dropout_check = self.keep_prob<=tf.constant(1.0)
             
-            dropout = tf.cond(dropout_check, dropout_check_true, dropout_check_false)
+            # dropout = tf.cond(dropout_check, dropout_check_true, dropout_check_false)
             
-            self.activations = tf.nn.dropout(self.activations, keep_prob=dropout)
+            # self.activations = tf.nn.dropout(self.activations, keep_prob=dropout)
             #activations = activation_fn(conv, name='activation')
             tf.summary.histogram('activations', self.activations)
             tf.summary.histogram('weights', self.weights)

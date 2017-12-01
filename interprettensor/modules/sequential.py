@@ -148,7 +148,7 @@ class Sequential(Module):
         for which the explanation is to be computed. calling clean in between forward and lrp invalidates the
         temporary data
         '''
-        print('Computing LRP ... '
+        print('Computing LRP ... ')
         print('------------------------------------------------- ')
 
         for m in self.modules[::-1]:

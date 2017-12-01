@@ -59,8 +59,8 @@ class Train():
                 self.cost = tf.sqrt(tf.reduce_mean(tf.square(tf.sub(self.output, self.ground_truth))))
             tf.summary.scalar('Loss', self.cost)
         else:
-            print 'Loss should be one of [softmax_crossentropy, sigmoid_crossentropy, MSE] '
-            print 'If not define your own loss'
+            print('Loss should be one of [softmax_crossentropy, sigmoid_crossentropy, MSE] ')
+            print('If not define your own loss')
         
     
 
@@ -81,6 +81,6 @@ class Train():
             elif self.optimizer == 'adadelta':
                 self.train = tf.train.AdadeltaOptimizer(self.learning_rate).minimize(self.cost)
             else:
-                print 'Optimizer should be one of: [adam, adagrad, adadelta, grad_descent, rmsprop]'
+                print('Optimizer should be one of: [adam, adagrad, adadelta, grad_descent, rmsprop]')
 
                 

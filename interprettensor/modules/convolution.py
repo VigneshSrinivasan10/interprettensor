@@ -96,8 +96,8 @@ class Convolution(Module):
             elif hasattr(self.act, '__call__'):
                 self.activations = self.act(conv)
                 
-            if self.keep_prob<1.0:
-                self.activations = tf.nn.dropout(self.activations, keep_prob=self.keep_prob)
+            # if self.keep_prob<1.0:
+            #     self.activations = tf.nn.dropout(self.activations, keep_prob=self.keep_prob)
             
             tf.summary.histogram('activations', self.activations)
             tf.summary.histogram('weights', self.weights)
