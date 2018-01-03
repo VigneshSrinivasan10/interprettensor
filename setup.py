@@ -12,6 +12,6 @@ setup(
     url='https://github.com/sebastian-lapuschkin/lrp_toolbox/tree/tf/tensorflow',
     download_url='https://github.com/sebastian-lapuschkin/lrp_toolbox/tree/tf/tensorflow/tarball/' + __version__,
     license='MIT',
-    install_requires=['tensorflow<=0.12.0rc1'],
+    install_requires=['tensorflow>=1.0.0'],
     keywords=['tensorflow', 'LRP', 'wrapper', 'slim', 'toolbox'],
 )
