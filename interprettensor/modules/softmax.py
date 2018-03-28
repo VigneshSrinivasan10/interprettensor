@@ -12,7 +12,7 @@
 '''
 
 import tensorflow as tf
-from module import Module
+from modules.module import Module
 
 
 
@@ -43,7 +43,8 @@ class Softmax(Module):
         # makes sure subroutines never get called.
         self.R = R
         #Rx = self.input_tensor  * self.activations
-        Rx = self.input_tensor  * self.R
+        #Rx = self.input_tensor  * self.R
+        Rx = self.R
         #Rx = Rx / tf.reduce_sum(self.input_tensor)
         
         #import pdb; pdb.set_trace()

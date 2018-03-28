@@ -14,8 +14,8 @@
 import copy
 import sys
 import numpy as np
-from module import Module
-from train import Train
+from modules.module import Module
+from modules.train import Train
 na = np.newaxis
 
 # -------------------------------

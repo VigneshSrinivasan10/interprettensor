@@ -12,7 +12,7 @@
 '''
 
 import tensorflow as tf
-from module import Module
+from modules.module import Module
 
 
 

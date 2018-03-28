@@ -12,10 +12,10 @@
 '''
 
 import tensorflow as tf
-from module import Module
-import variables
+from modules.module import Module
+import modules.variables as variables
 import pdb
-import activations
+import modules.activations as activations
 
 from math import ceil
 
@@ -95,9 +95,8 @@ class Convolution(Module):
                 self.activations = activations.apply(conv, self.act)
             elif hasattr(self.act, '__call__'):
                 self.activations = self.act(conv)
-                
-            # if self.keep_prob<1.0:
-            #     self.activations = tf.nn.dropout(self.activations, keep_prob=self.keep_prob)
+            if self.keep_prob<1.0:
+                self.activations = tf.nn.dropout(self.activations, keep_prob=self.keep_prob)
             
             tf.summary.histogram('activations', self.activations)
             tf.summary.histogram('weights', self.weights)
@@ -111,23 +110,19 @@ class Convolution(Module):
         '''
         
         self.check_shape(R)
-
         image_patches = self.extract_patches()
-        Z = self.compute_z(image_patches)
-        Zs = self.compute_zs(Z)
-        result = self.compute_result(Z,Zs)
-        return self.restitch_image(result)
+        result = image_patches * tf.reduce_sum(tf.expand_dims(self.weights,0) * tf.reshape((self.R/(self.activations+1e-8)), [self.in_N,self.Hout,self.Wout,1,1,1,self.output_depth]), -1)
+        return_vals =  self.restitch_image(result)
         
+
+        return return_vals
     def _epsilon_lrp(self,R, epsilon):
         '''
         LRP according to Eq(58) in DOI: 10.1371/journal.pone.0130140
         '''
         self.check_shape(R)
-
         image_patches = self.extract_patches()
-        Z = self.compute_z(image_patches)
-        Zs = self.compute_zs(Z, epsilon=epsilon)
-        result = self.compute_result(Z,Zs)
+        result = image_patches * tf.reduce_sum(tf.expand_dims(self.weights,0) * tf.reshape((self.R/(self.activations+epsilon)), [self.in_N,self.Hout,self.Wout,1,1,1,self.output_depth]), -1)
         return self.restitch_image(result)
 
     def _ww_lrp(self,R): 
@@ -135,16 +130,8 @@ class Convolution(Module):
         LRP according to Eq(12) in https://arxiv.org/pdf/1512.02479v1.pdf
         '''
         self.check_shape(R)
-
-        image_patches = tf.ones([self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth])
-        #pdb.set_trace()
-        ww = tf.square(self.weights)
-        Z = tf.expand_dims(ww,0)
-        #self.Z = tf.expand_dims(tf.tile(tf.reshape(ww, [1,1,self.kernel_size, self.kernel_size, self.in_depth, self.output_depth]), [self.Hout, self.Wout, 1,1,1,1]), 0)
-        #self.Z = tf.expand_dims(tf.square(self.weights), 0) * tf.expand_dims(image_patches, -1)
-        #self.Zs = tf.reduce_sum(self.Z, [3,4,5], keep_dims=True)
-        Zs = tf.reduce_sum(Z, [1,2,3], keep_dims=True)
-        result = self.compute_result(Z, Zs)
+        Z = tf.expand_dims(tf.square(self.weights),0)
+        result = tf.reduce_sum(Z * tf.reshape((self.R/(tf.reduce_sum(Z, [1,2,3])+1e-16)), [self.in_N,self.Hout,self.Wout,1,1,1,self.output_depth]), -1)
         return self.restitch_image(result)
 
     def _flat_lrp(self,R):
@@ -152,10 +139,8 @@ class Convolution(Module):
         distribute relevance for each output evenly to the output neurons' receptive fields.
         '''
         self.check_shape(R)
-
         Z = tf.ones([self.in_N, self.Hout,self.Wout, self.kernel_size,self.kernel_size, self.in_depth, self.output_depth])
-        Zs = self.compute_zs(Z)
-        result = self.compute_result(Z,Zs)
+        result = self.compute_result(Z)
         return self.restitch_image(result)
 
 
@@ -165,22 +150,18 @@ class Convolution(Module):
         '''
         beta = 1 - alpha
         self.check_shape(R)
-
         image_patches = self.extract_patches()
         Z = self.compute_z(image_patches)
         if not alpha == 0:
             Zp = tf.where(tf.greater(Z,0),Z, tf.zeros_like(Z))
-            Zsp = self.compute_zs(Zp)
-            Ralpha = alpha * self.compute_result(Zp,Zsp)
+            Ralpha = alpha * self.compute_result(Zp)
         else:
             Ralpha = 0
         if not beta == 0:
             Zn = tf.where(tf.less(Z,0),Z, tf.zeros_like(Z))
-            Zsn = self.compute_zs(Zn)
-            Rbeta = beta * self.compute_result(Zn,Zsn)
+            Rbeta = beta * self.compute_result(Zn)
         else:
             Rbeta = 0
-
         result = Ralpha + Rbeta
         return self.restitch_image(result)
     
@@ -207,10 +188,9 @@ class Convolution(Module):
             Zs += stabilizer
         return Zs
 
-    def compute_result(self, Z, Zs):
-        result = tf.reduce_sum((Z/Zs) * tf.reshape(self.R, [self.in_N,self.Hout,self.Wout,1,1,1,self.output_depth]), 6)
-        return tf.reshape(result, [self.in_N,self.Hout,self.Wout, self.kernel_size*self.kernel_size*self.in_depth])
-
+    def compute_result(self, Z, epsilon=1e-12):
+        return tf.reduce_sum(Z * tf.reshape((self.R/(tf.reduce_sum(Z, [3,4,5])+epsilon)), [self.in_N,self.Hout,self.Wout,1,1,1,self.output_depth]), -1)
+        
     def restitch_image(self, result):
         return self.patches_to_images(result, self.in_N, self.in_h, self.in_w, self.in_depth, self.Hout, self.Wout, self.kernel_size, self.kernel_size, self.stride_size,self.stride_size )
 

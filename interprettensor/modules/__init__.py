@@ -11,15 +11,14 @@
 @license : BSD-2-Clause
 '''
 
-
-from module import Module
-from linear import Linear
-from tanh import Tanh
-from softmax import Softmax
-from relu import Relu
-from sigmoid import Sigmoid
-from convolution import Convolution
-from sequential import Sequential
-from avgpool import AvgPool
-from maxpool import MaxPool
+from modules.module import Module
+from modules.linear import Linear
+from modules.tanh import Tanh
+from modules.softmax import Softmax
+from modules.relu import Relu
+from modules.sigmoid import Sigmoid
+from modules.convolution import Convolution
+from modules.sequential import Sequential
+from modules.avgpool import AvgPool
+from modules.maxpool import MaxPool
 

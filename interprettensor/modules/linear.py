@@ -12,9 +12,9 @@
 '''
 
 import tensorflow as tf
-from module import Module
-import variables
-import activations
+from modules.module import Module
+import modules.variables as variables
+import modules.activations as activations
 
 class Linear(Module):
     '''
@@ -99,7 +99,7 @@ class Linear(Module):
     def clean(self):
         self.activations = None
         self.R = None
-        
+
     def _simple_lrp(self, R):
         self.R = R
         R_shape = self.R.get_shape().as_list()
@@ -107,14 +107,21 @@ class Linear(Module):
             activations_shape = self.activations.get_shape().as_list()
             self.R = tf.reshape(self.R, activations_shape)
 
-        Z = tf.expand_dims(self.weights, 0) * tf.expand_dims(self.input_tensor, -1)
-        Zs = tf.expand_dims(tf.reduce_sum(Z, 1), 1) + tf.expand_dims(tf.expand_dims(self.biases, 0), 0)
-        stabilizer = 1e-8*(tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs, dtype=tf.float32), tf.ones_like(Zs, dtype=tf.float32)*-1))
-        Zs += stabilizer
-                
-        return tf.reduce_sum((Z / Zs) * tf.expand_dims(self.R, 1),2)
+        return self.input_tensor * tf.reduce_sum(tf.expand_dims(self.weights,0) * tf.expand_dims(self.R/(self.activations+1e-3),1), -1)
+        
+    def _epsilon_lrp(self,R,epsilon):
+        '''
+        LRP according to Eq(58) in DOI: 10.1371/journal.pone.0130140
+        '''
+        self.R= R
+        #import pdb;pdb.set_trace()
+        R_shape = self.R.get_shape().as_list()
+        if len(R_shape)!=2:
+            activations_shape = self.activations.get_shape().as_list()
+            self.R = tf.reshape(self.R, activations_shape)
 
-    
+        return self.input_tensor * tf.reduce_sum(tf.expand_dims(self.weights,0) * tf.expand_dims(self.R/(self.activations+epsilon),1), -1)
+
     def _flat_lrp(self,R):
         '''
         distribute relevance for each output evenly to the output neurons' receptive fields.
@@ -134,17 +141,7 @@ class Linear(Module):
         Zs = tf.expand_dims( tf.reduce_sum(Z, 1), 1)
         return tf.reduce_sum((Z / Zs) * tf.expand_dims(self.R, 1),2)
         
-    def _epsilon_lrp(self,R,epsilon):
-        '''
-        LRP according to Eq(58) in DOI: 10.1371/journal.pone.0130140
-        '''
-        self.R= R
-        Z = tf.expand_dims(self.weights, 0) * tf.expand_dims(self.input_tensor, -1)
-        Zs = tf.expand_dims(tf.reduce_sum(Z, 1), 1) + tf.expand_dims(tf.expand_dims(self.biases, 0), 0)
-        Zs += epsilon * tf.where(tf.greater_equal(Zs,0), tf.ones_like(Zs), tf.ones_like(Zs)*-1)
-
-        return tf.reduce_sum((Z / Zs) * tf.expand_dims(self.R, 1),2)
-
+        
     def _alphabeta_lrp(self,R,alpha):
         '''
         LRP according to Eq(60) in DOI: 10.1371/journal.pone.0130140

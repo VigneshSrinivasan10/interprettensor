@@ -44,7 +44,7 @@ flags.DEFINE_float("dropout", 0.9, 'Keep probability for training dropout.')
 flags.DEFINE_string("data_dir", 'data','Directory for storing data')
 flags.DEFINE_string("summaries_dir", 'mnist_linear_logs','Summaries directory')
 flags.DEFINE_boolean("relevance", False,'Compute relevances')
-flags.DEFINE_string("relevance_method", 'simple','relevance methods: simple/eps/w^2/alphabeta')
+flags.DEFINE_string("relevance_method", 'simple','relevance methods: simple/epsilon/ww/flat/alphabeta')
 flags.DEFINE_boolean("save_model", False,'Save the trained model')
 flags.DEFINE_boolean("reload_model", False,'Restore the trained model')
 flags.DEFINE_string("checkpoint_dir", 'mnist_linear_model','Checkpoint dir')
@@ -57,7 +57,8 @@ def nn():
                      Linear(1296, act ='relu'), 
                      Linear(1296, act ='relu'),
                      Linear(10, act ='relu'),
-                     Softmax()])
+                       #Softmax()
+    ])
 
 
 # input dict creation as per tensorflow source code
@@ -89,17 +90,18 @@ def train():
         
     with tf.variable_scope('relevance'):    
         if FLAGS.relevance:
-            LRP = net.lrp(y,FLAGS.relevance_method, 1e-8)
+            LRP = net.lrp(y,FLAGS.relevance_method, 1)
             
             # LRP layerwise 
             relevance_layerwise = []
-            # R = y
-            # for layer in net.modules[::-1]:
-            #     R = net.lrp_layerwise(layer, R, 'simple')
-            #     relevance_layerwise.append(R)
+            R = y
+            for layer in net.modules[::-1]:
+                R = net.lrp_layerwise(layer, R, 'alphabeta',1)
+                relevance_layerwise.append(R)
         else:
             LRP = []
             relevance_layerwise = []
+            
     # Accuracy computation
     with tf.name_scope('correct_prediction'):
         correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
@@ -121,7 +123,6 @@ def train():
 
     uninit_vars = set(tf.global_variables()) - set(tf.trainable_variables())
     tf.variables_initializer(uninit_vars).run()
-   
             
     # iterate over train and test data
     for i in range(FLAGS.max_steps):
@@ -132,6 +133,9 @@ def train():
             summary, acc , relevance_test, op, rel_layer= sess.run([merged, accuracy, LRP,y, relevance_layerwise], feed_dict=test_inp)
             test_writer.add_summary(summary, i)
             print('Accuracy at step %s: %f' % (i, acc))
+            print([np.sum(rel) for rel in rel_layer])
+            print(np.sum(relevance_test))
+
             
         else:
             d = feed_dict(mnist, True)
@@ -143,8 +147,7 @@ def train():
     # relevances plotted with visually pleasing color schemes
     if FLAGS.relevance:
         # plot test images with relevances overlaid
-        images = test_inp[test_inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
-        images = (images + 1)/2.0
+        images = d[0].reshape([FLAGS.batch_size,28,28,1])
         plot_relevances(relevance_test.reshape([FLAGS.batch_size,28,28,1]), images, test_writer )
         # plot train images with relevances overlaid
         # images = inp[inp.keys()[0]].reshape([FLAGS.batch_size,28,28,1])
