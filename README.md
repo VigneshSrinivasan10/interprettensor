@@ -8,7 +8,7 @@ This tensorflow wrapper provides simple and accessible stand-alone implementatio
 
 ### Requirements
     tensorflow >= 1.0.0
-    python == 2.7
+    python >= 3
     matplotlib >= 1.3.1
     scikit-image > 0.11.3
     
